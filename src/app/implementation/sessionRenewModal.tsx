@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -15,8 +15,16 @@ import { SessionRenewModalProps } from '@/app/types/SessionRenewModalProps';
 export const SessionRenewModalImpl = React.forwardRef<
   HTMLDivElement,
   SessionRenewModalProps
->(({ open, sessionName, sessionId, onClose, isRenewing = true }, ref) => {
+>(({ open, sessionName, sessionId, onClose, onConfirm, isRenewing = true }, ref) => {
   const theme = useTheme();
+
+  // Trigger the renew action when modal opens
+  useEffect(() => {
+    if (open && onConfirm) {
+      console.log('SessionRenewModal: Calling onConfirm for session:', sessionId);
+      onConfirm(12); // Default 12 hours - can be made configurable later
+    }
+  }, [open, onConfirm, sessionId]);
 
   return (
     <Dialog

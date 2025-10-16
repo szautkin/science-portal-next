@@ -253,10 +253,14 @@ export const SessionCardImpl = React.forwardRef<
     const handleDeleteConfirm = useCallback(async () => {
       setIsDeleting(true);
       try {
-        // Simulate deletion or call actual delete function
-        await onDelete?.();
-        // Wait a bit to show the deleting state
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Call the actual delete function
+        if (onDelete) {
+          await onDelete();
+        }
+        // Wait a bit to show the deleting state before closing modal
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Error deleting session:', error);
       } finally {
         setIsDeleting(false);
         setShowDeleteModal(false);
@@ -266,17 +270,26 @@ export const SessionCardImpl = React.forwardRef<
     const handleExtendClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       setShowRenewModal(true);
-      setIsRenewing(true);
+    };
 
-      // Simulate renewal process
-      setTimeout(() => {
+    const handleRenewConfirm = useCallback(async (hours: number) => {
+      setIsRenewing(true);
+      try {
+        // Call the actual renew function
+        if (onExtendTime) {
+          await onExtendTime();
+        }
+        // Wait a bit to show success state
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Error renewing session:', error);
+      } finally {
         setIsRenewing(false);
         setTimeout(() => {
           setShowRenewModal(false);
-          onExtendTime?.();
-        }, 1000);
-      }, 2000);
-    };
+        }, 500);
+      }
+    }, [onExtendTime]);
 
     if (loading) {
       return (
@@ -717,6 +730,7 @@ export const SessionCardImpl = React.forwardRef<
           sessionName={sessionName}
           sessionId={sessionId}
           onClose={() => setShowRenewModal(false)}
+          onConfirm={handleRenewConfirm}
           isRenewing={isRenewing}
         />
       </>

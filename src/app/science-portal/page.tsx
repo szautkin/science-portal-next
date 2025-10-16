@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
 import { UserStorageWidget } from '@/app/components/UserStorageWidget/UserStorageWidget';
@@ -13,40 +13,78 @@ import { ThemeToggle } from '@/app/components/ThemeToggle/ThemeToggle';
 import { appBarWithUserMenu, CanfarLogo } from '@/stories/shared/navigation';
 import type { SessionCardProps } from '@/app/types/SessionCardProps';
 import type { PlatformLoadData } from '@/app/types/PlatformLoadProps';
+import { useAuthStatus } from '@/lib/hooks/useAuth';
+import { useSessions, useDeleteSession, useRenewSession } from '@/lib/hooks/useSessions';
+import type { Session } from '@/lib/api/skaha';
 
 export default function SciencePortalPage() {
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [isLoadingPlatform, setIsLoadingPlatform] = useState(false);
 
-  // Mock active sessions data
-  const [activeSessions, setActiveSessions] = useState<SessionCardProps[]>([
-    {
-      sessionType: 'notebook',
-      sessionName: 'analysis-notebook-01',
-      status: 'Running',
-      containerImage: 'images.canfar.net/ml:latest',
-      startedTime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      expiresTime: new Date(Date.now() + 10 * 60 * 60 * 1000).toISOString(),
-      memoryUsage: '3.2G',
-      memoryAllocated: '8G',
-      cpuUsage: '1.5',
-      cpuAllocated: '2',
-      connectUrl: '/sessions/notebook/analysis-notebook-01',
+  // Get authentication status
+  const { data: authStatus } = useAuthStatus();
+  const isAuthenticated = authStatus?.authenticated ?? false;
+
+  // Fetch active sessions using the hook
+  const {
+    data: sessions = [],
+    isLoading,
+    isFetching,
+    refetch: refetchSessions
+  } = useSessions(isAuthenticated);
+
+  // Show loading state during initial load or manual refresh
+  const isLoadingSessions = isLoading || isFetching;
+
+  // Mutation hooks for session actions
+  const { mutate: deleteSession } = useDeleteSession({
+    onSuccess: () => {
+      console.log('Session deleted successfully');
     },
-    {
-      sessionType: 'desktop',
-      sessionName: 'desktop-session-02',
-      status: 'Running',
-      containerImage: 'images.canfar.net/desktop:latest',
-      startedTime: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      expiresTime: new Date(Date.now() + 11.5 * 60 * 60 * 1000).toISOString(),
-      memoryUsage: '5.1G',
-      memoryAllocated: '16G',
-      cpuUsage: '0.8',
-      cpuAllocated: '4',
-      connectUrl: '/sessions/desktop/desktop-session-02',
+    onError: (error) => {
+      console.error('Failed to delete session:', error);
     },
-  ]);
+  });
+
+  const { mutate: renewSession } = useRenewSession({
+    onSuccess: () => {
+      console.log('Session renewed successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to renew session:', error);
+    },
+  });
+
+  // Transform Session data to SessionCardProps format with action handlers
+  const activeSessions: SessionCardProps[] = useMemo(() => {
+    return sessions.map((session: Session) => ({
+      id: session.id,
+      sessionId: session.sessionId,
+      sessionType: session.sessionType,
+      sessionName: session.sessionName,
+      status: session.status,
+      containerImage: session.containerImage,
+      startedTime: session.startedTime,
+      expiresTime: session.expiresTime,
+      memoryUsage: session.memoryUsage,
+      memoryAllocated: session.memoryAllocated,
+      cpuUsage: session.cpuUsage,
+      cpuAllocated: session.cpuAllocated,
+      connectUrl: session.connectUrl,
+      requestedRAM: session.requestedRAM,
+      requestedCPU: session.requestedCPU,
+      onDelete: () => {
+        if (session.id) {
+          deleteSession(session.id);
+        }
+      },
+      onExtendTime: () => {
+        if (session.id) {
+          // Default to 12 hours extension - this will be customizable via modal
+          renewSession({ sessionId: session.id, hours: 12 });
+        }
+      },
+    }));
+  }, [sessions, deleteSession, renewSession]);
 
   // Mock platform load data
   const [platformLoadData, setPlatformLoadData] = useState<PlatformLoadData>({
@@ -76,19 +114,9 @@ export default function SciencePortalPage() {
 
   // Handle refresh for ActiveSessionsWidget
   const handleSessionsRefresh = useCallback(() => {
-    setIsLoadingSessions(true);
-
-    // Simulate fetching new session data
-    setTimeout(() => {
-      // In a real app, you would fetch new data here
-      console.log('Refreshing sessions data...');
-
-      // Optional: Update sessions with new mock data or keep the same
-      setActiveSessions((prev) => [...prev]);
-
-      setIsLoadingSessions(false);
-    }, 2000);
-  }, []);
+    // Refetch sessions from API
+    refetchSessions();
+  }, [refetchSessions]);
 
   // Handle refresh for PlatformLoad
   const handlePlatformRefresh = useCallback(() => {
@@ -220,10 +248,10 @@ export default function SciencePortalPage() {
               }}
             >
               <UserStorageWidget
-                isAuthenticated={true}
-                name="janedoe"
+                isAuthenticated={isAuthenticated}
+                name={authStatus?.user?.username || ''}
                 storageUrl="https://api.canfar.net/storage/"
-                testMode={true}
+                testMode={!isAuthenticated}
               />
             </Box>
           </Box>

@@ -1,8 +1,8 @@
 /**
- * Container Images API Route
+ * Image Repository API Route
  *
- * Handles retrieving available container images.
- * GET - Get available container images
+ * Handles retrieving Image Repository hosts configured in SKAHA.
+ * GET - Get image repository hosts
  */
 
 import { NextRequest } from 'next/server';
@@ -16,11 +16,11 @@ import {
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
-import type { ContainerImage } from '@/lib/api/skaha';
+import type { ImageRepository } from '@/lib/api/skaha';
 
 /**
- * GET /api/sessions/images
- * Get available container images
+ * GET /api/sessions/repository
+ * List the Image Repository hosts configured as a JSON Array
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
   if (!validateMethod(request, ['GET'])) {
@@ -30,7 +30,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const authHeaders = forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v1/image`,
+    `${serverApiConfig.skaha.baseUrl}/v1/repository`,
     {
       method: 'GET',
       headers: {
@@ -43,11 +43,11 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
 
   if (!response.ok) {
     return errorResponse(
-      'Failed to fetch container images',
+      'Failed to fetch image repositories',
       response.status
     );
   }
 
-  const images: ContainerImage[] = await response.json();
-  return successResponse(images);
+  const repositories: ImageRepository[] = await response.json();
+  return successResponse(repositories);
 });

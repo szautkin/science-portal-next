@@ -90,7 +90,7 @@ export async function getRequestBody<T>(request: NextRequest): Promise<T> {
 }
 
 /**
- * Fetches from external API with error handling
+ * Fetches from external API with error handling and logging
  */
 export async function fetchExternalApi(
   url: string,
@@ -100,6 +100,42 @@ export async function fetchExternalApi(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  // Log the outgoing request to external API
+  const method = options.method || 'GET';
+  console.log('\n' + '🔵'.repeat(40));
+  console.log(`🌐 SKAHA API REQUEST: ${method} ${url}`);
+  console.log('🔵'.repeat(40));
+  console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+
+  // Log headers (mask sensitive data)
+  if (options.headers) {
+    console.log('\n📋 Request Headers:');
+    const headers = options.headers as Record<string, string>;
+    const sanitizedHeaders: Record<string, string> = {};
+    Object.entries(headers).forEach(([key, value]) => {
+      if (key.toLowerCase() === 'authorization') {
+        sanitizedHeaders[key] = value ? `Bearer ${value.substring(7, 27)}...` : '<empty>';
+      } else {
+        sanitizedHeaders[key] = value;
+      }
+    });
+    console.log(JSON.stringify(sanitizedHeaders, null, 2));
+  }
+
+  // Log request body if present
+  if (options.body) {
+    console.log('\n📦 Request Body:');
+    try {
+      const bodyData = JSON.parse(options.body as string);
+      console.log(JSON.stringify(bodyData, null, 2));
+    } catch {
+      console.log(options.body);
+    }
+  }
+  console.log('🔵'.repeat(40) + '\n');
+
+  const startTime = Date.now();
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -108,9 +144,63 @@ export async function fetchExternalApi(
     });
 
     clearTimeout(timeoutId);
+
+    // Clone the response so we can read the body for logging without consuming it
+    const clonedResponse = response.clone();
+    const duration = Date.now() - startTime;
+    const statusIcon = response.ok ? '✅' : '❌';
+
+    console.log('\n' + '🟢'.repeat(40));
+    console.log(`${statusIcon} SKAHA API RESPONSE: ${method} ${url}`);
+    console.log('🟢'.repeat(40));
+    console.log(`📊 Status: ${response.status} ${response.statusText}`);
+    console.log(`⏱️  Duration: ${duration}ms`);
+
+    // Try to parse and log the response payload
+    try {
+      const contentType = clonedResponse.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        const payload = await clonedResponse.json();
+        console.log('\n📦 Response Payload:');
+
+        // For arrays, show count and first few items
+        if (Array.isArray(payload)) {
+          console.log(`   Array with ${payload.length} item(s)`);
+          if (payload.length > 0) {
+            console.log('   First item(s):');
+            console.log(JSON.stringify(payload.slice(0, 3), null, 2));
+            if (payload.length > 3) {
+              console.log(`   ... and ${payload.length - 3} more item(s)`);
+            }
+          }
+        } else {
+          console.log(JSON.stringify(payload, null, 2));
+        }
+      } else if (contentType?.includes('text/')) {
+        const text = await clonedResponse.text();
+        console.log('\n📦 Response Text:');
+        console.log(text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+      }
+    } catch (parseError) {
+      // If we can't parse, just skip logging the body
+      console.log('\n📦 Response body: (unable to parse)');
+    }
+
+    console.log('🟢'.repeat(40) + '\n');
+
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
+    const duration = Date.now() - startTime;
+
+    // Log the error
+    console.log('\n' + '🔴'.repeat(40));
+    console.log(`❌ SKAHA API ERROR: ${method} ${url}`);
+    console.log('🔴'.repeat(40));
+    console.log(`⏱️  Duration: ${duration}ms`);
+    console.log(`💥 Error: ${error instanceof Error ? error.message : String(error)}`);
+    console.log('🔴'.repeat(40) + '\n');
+
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(`External API timeout after ${timeout}ms`);
     }

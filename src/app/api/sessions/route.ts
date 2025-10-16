@@ -18,13 +18,17 @@ import {
   getRequestBody,
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
-import type { Session, SessionLaunchParams } from '@/lib/api/skaha';
+import { createLogger } from '@/app/api/lib/logger';
+import type { SkahaSessionResponse, SessionLaunchParams } from '@/lib/api/skaha';
 
 /**
  * GET /api/sessions
  * List all active sessions for the current user
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
+  const logger = createLogger('/api/sessions', 'GET');
+  logger.logRequest(request);
+
   if (!validateMethod(request, ['GET'])) {
     return methodNotAllowed(['GET']);
   }
@@ -32,7 +36,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const authHeaders = forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/session`,
+    `${serverApiConfig.skaha.baseUrl}/v1/session`,
     {
       method: 'GET',
       headers: {
@@ -44,13 +48,16 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   );
 
   if (!response.ok) {
+    logger.logError(response.status, `Failed to fetch sessions: ${response.statusText}`);
     return errorResponse(
       'Failed to fetch sessions',
       response.status
     );
   }
 
-  const sessions: Session[] = await response.json();
+  const sessions: SkahaSessionResponse[] = await response.json();
+  logger.info(`Retrieved ${sessions.length} session(s)`);
+  logger.logSuccess(200, { count: sessions.length });
   return successResponse(sessions);
 });
 
@@ -59,14 +66,18 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
  * Launch a new session
  */
 export const POST = withErrorHandling(async (request: NextRequest) => {
+  const logger = createLogger('/api/sessions', 'POST');
+
   if (!validateMethod(request, ['POST'])) {
     return methodNotAllowed(['POST']);
   }
 
   const body = await getRequestBody<SessionLaunchParams>(request);
+  logger.logRequest(request, body);
 
   // Validate required fields
   if (!body.sessionType || !body.sessionName || !body.containerImage) {
+    logger.logError(400, 'Missing required fields: sessionType, sessionName, containerImage');
     return errorResponse(
       'Missing required fields: sessionType, sessionName, containerImage',
       400
@@ -74,6 +85,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   }
 
   if (!body.cores || !body.ram) {
+    logger.logError(400, 'Missing required fields: cores, ram');
     return errorResponse(
       'Missing required fields: cores, ram',
       400
@@ -83,7 +95,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   const authHeaders = forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/session`,
+    `${serverApiConfig.skaha.baseUrl}/v1/session`,
     {
       method: 'POST',
       headers: {
@@ -98,6 +110,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   if (!response.ok) {
     const errorText = await response.text();
+    logger.logError(response.status, `Failed to launch session: ${response.statusText}`, errorText);
     return errorResponse(
       'Failed to launch session',
       response.status,
@@ -105,6 +118,8 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     );
   }
 
-  const session: Session = await response.json();
+  const session: SkahaSessionResponse = await response.json();
+  logger.info(`Successfully launched session: ${session.name}`);
+  logger.logSuccess(201, { sessionId: session.id, sessionName: session.name });
   return successResponse(session, 201);
 });

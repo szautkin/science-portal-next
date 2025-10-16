@@ -11,6 +11,29 @@ import { getAuthHeader } from '@/lib/auth/token-storage';
 export type SessionType = 'notebook' | 'desktop' | 'headless' | 'carta' | 'contributednotebook' | 'contributeddesktop';
 export type SessionStatus = 'Running' | 'Pending' | 'Terminating' | 'Error' | 'Failed' | 'Unknown';
 
+// SKAHA API raw response format
+export interface SkahaSessionResponse {
+  id: string;
+  userid: string;
+  runAsUID: string;
+  runAsGID: string;
+  supplementalGroups?: number[];
+  image: string;
+  type: string;
+  status: string;
+  name: string;
+  startTime: string;
+  expiryTime: string;
+  connectURL: string;
+  requestedRAM?: string;
+  requestedCPU?: string;
+  requestedGPUCores?: string;
+  ramInUse?: string;
+  cpuCoresInUse?: string;
+  isFixedResources?: boolean;
+}
+
+// Normalized session interface for internal use
 export interface Session {
   id: string;
   sessionId?: string;
@@ -55,6 +78,12 @@ export interface ContainerImage {
   types: SessionType[];
 }
 
+export interface ImageRepository {
+  host: string;
+  hostname?: string;
+  [key: string]: string | undefined;
+}
+
 export interface SessionLaunchParams {
   sessionType: SessionType;
   sessionName: string;
@@ -63,6 +92,29 @@ export interface SessionLaunchParams {
   ram: number;
   env?: Record<string, string>;
   cmd?: string;
+}
+
+/**
+ * Transform SKAHA API response to normalized Session format
+ */
+function transformSkahaSession(skahaSession: SkahaSessionResponse): Session {
+  return {
+    id: skahaSession.id,
+    sessionId: skahaSession.id,
+    sessionType: skahaSession.type as SessionType,
+    sessionName: skahaSession.name,
+    status: skahaSession.status as SessionStatus,
+    containerImage: skahaSession.image,
+    startedTime: skahaSession.startTime,
+    expiresTime: skahaSession.expiryTime,
+    memoryUsage: skahaSession.ramInUse,
+    memoryAllocated: skahaSession.requestedRAM || 'N/A',
+    cpuUsage: skahaSession.cpuCoresInUse,
+    cpuAllocated: skahaSession.requestedCPU || 'N/A',
+    connectUrl: skahaSession.connectURL,
+    requestedRAM: skahaSession.requestedRAM,
+    requestedCPU: skahaSession.requestedCPU,
+  };
 }
 
 /**
@@ -80,7 +132,8 @@ export async function getSessions(): Promise<Session[]> {
     throw new Error(`Failed to fetch sessions: ${response.status}`);
   }
 
-  return response.json();
+  const skahaResponse: SkahaSessionResponse[] = await response.json();
+  return skahaResponse.map(transformSkahaSession);
 }
 
 /**
@@ -177,6 +230,24 @@ export async function getContainerImages(): Promise<ContainerImage[]> {
 }
 
 /**
+ * Get image repository hosts
+ */
+export async function getImageRepositories(): Promise<ImageRepository[]> {
+  const authHeaders = getAuthHeader();
+  const response = await fetch('/api/sessions/repository', {
+    method: 'GET',
+    headers: { 'Accept': 'application/json', ...authHeaders },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image repositories: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Get session logs
  */
 export async function getSessionLogs(sessionId: string): Promise<string> {
@@ -214,10 +285,13 @@ export async function getSessionEvents(sessionId: string): Promise<any[]> {
 
 /**
  * Extend session expiry time
+ *
+ * Note: SKAHA API uses the configured expiry time in skaha.sessionexpiry
+ * The hours parameter is optional and currently not used by SKAHA
  */
 export async function renewSession(
   sessionId: string,
-  additionalHours: number
+  additionalHours?: number
 ): Promise<Session> {
   const authHeaders = getAuthHeader();
   const response = await fetch(`/api/sessions/${sessionId}/renew`, {
@@ -235,5 +309,7 @@ export async function renewSession(
     throw new Error(`Failed to renew session ${sessionId}: ${response.status}`);
   }
 
-  return response.json();
+  // Transform SKAHA response to normalized Session format
+  const skahaResponse: SkahaSessionResponse = await response.json();
+  return transformSkahaSession(skahaResponse);
 }

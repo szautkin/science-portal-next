@@ -16,6 +16,7 @@ import {
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
+import { createLogger } from '@/app/api/lib/logger';
 import type { PlatformLoad } from '@/lib/api/skaha';
 
 /**
@@ -23,6 +24,9 @@ import type { PlatformLoad } from '@/lib/api/skaha';
  * Get platform load statistics
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
+  const logger = createLogger('/api/sessions/platform-load', 'GET');
+  logger.logRequest(request);
+
   if (!validateMethod(request, ['GET'])) {
     return methodNotAllowed(['GET']);
   }
@@ -30,7 +34,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const authHeaders = forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/context`,
+    `${serverApiConfig.skaha.baseUrl}/v1/session?view=stats`,
     {
       method: 'GET',
       headers: {
@@ -42,6 +46,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   );
 
   if (!response.ok) {
+    logger.logError(response.status, `Failed to fetch platform load: ${response.statusText}`);
     return errorResponse(
       'Failed to fetch platform load',
       response.status
@@ -79,5 +84,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     lastUpdate: lastUpdate as any, // Cast to match PlatformLoad type
   };
 
+  logger.info(`Platform stats - Sessions: ${data.currentSessions}/${data.maxSessions}, CPU: ${data.requestedCores}/${data.availableCores}, RAM: ${data.requestedRAM}/${data.availableRAM}`);
+  logger.logSuccess(200, platformLoad);
   return successResponse(platformLoad);
 });
