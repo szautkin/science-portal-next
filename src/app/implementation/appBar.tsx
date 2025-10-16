@@ -35,6 +35,7 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
       menuItems = [],
       menuLabel = 'Menu',
       accountButton,
+      onAccountButtonClick,
       position = 'static',
       elevation = 0,
       variant = 'surface',
@@ -209,6 +210,28 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
     const handleMobileDrawerClose = useCallback(() => {
       setMobileDrawerOpen(false);
     }, []);
+
+    // Handle account button click - either open menu or call custom handler
+    const handleAccountButtonClick = useCallback(
+      (event: React.MouseEvent<HTMLElement>) => {
+        console.log('AppBar button clicked:', {
+          menuItemsLength: menuItems.length,
+          firstItemLabel: menuItems[0]?.label,
+          hasCustomHandler: !!onAccountButtonClick,
+        });
+
+        // If there are actual menu items (not just dummy), open the menu
+        if (menuItems.length > 0 && menuItems[0].label !== '') {
+          console.log('Opening menu dropdown');
+          handleMenuOpen(event);
+        } else if (onAccountButtonClick) {
+          // Otherwise call custom click handler
+          console.log('Calling custom click handler');
+          onAccountButtonClick();
+        }
+      },
+      [menuItems, handleMenuOpen, onAccountButtonClick]
+    );
 
     const { sx, ...otherProps } = props;
 
@@ -725,6 +748,7 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
                       fontWeight: theme.typography.fontWeightMedium,
                       fontFamily: theme.typography.fontFamily,
                       minHeight: '48px',
+                      minWidth: '120px',
                       transition: theme.transitions.create(
                         ['background-color', 'border-color', 'color'],
                         {
@@ -741,22 +765,24 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
                         outlineOffset: theme.spacing(0.25),
                       },
                     }}
-                    aria-label={menuLabel}
+                    aria-label={typeof menuLabel === 'string' ? menuLabel : 'Account menu'}
                     aria-controls={open ? 'app-bar-menu' : undefined}
                     aria-haspopup="menu"
                     aria-expanded={open ? 'true' : 'false'}
-                    onClick={handleMenuOpen}
+                    onClick={handleAccountButtonClick}
                   >
                     {menuLabel}
-                    <ArrowDropDownIcon
-                      sx={{
-                        color: 'inherit',
-                        transition: theme.transitions.create('transform', {
-                          duration: theme.transitions.duration.short,
-                        }),
-                        transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-                      }}
-                    />
+                    {menuItems.length > 0 && menuItems[0].label !== '' && (
+                      <ArrowDropDownIcon
+                        sx={{
+                          color: 'inherit',
+                          transition: theme.transitions.create('transform', {
+                            duration: theme.transitions.duration.short,
+                          }),
+                          transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}
+                      />
+                    )}
                   </Box>
                   <Menu
                     id="app-bar-menu"
@@ -764,7 +790,7 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
                     open={open}
                     onClose={handleMenuClose}
                     MenuListProps={{
-                      'aria-labelledby': menuLabel,
+                      'aria-labelledby': typeof menuLabel === 'string' ? menuLabel : 'Account menu',
                     }}
                     anchorOrigin={{
                       vertical: 'bottom',

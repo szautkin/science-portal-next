@@ -19,7 +19,7 @@ export interface BarChartDataItem {
   /**
    * Optional additional data properties for custom segments
    */
-  [key: string]: number | string;
+  [key: string]: number | string | undefined;
 }
 
 /**

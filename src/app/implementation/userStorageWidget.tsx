@@ -219,7 +219,7 @@ export const UserStorageWidgetImpl = React.forwardRef<
       setInternalError(undefined);
 
       try {
-        const response = await fetch(`${storageUrl}${name}`, {
+        const response = await fetch(`/api/storage/raw/${name}?name=${encodeURIComponent(name)}`, {
           headers: { Accept: 'application/xml' },
           credentials: 'include',
         });

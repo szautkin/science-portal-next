@@ -24,8 +24,9 @@ export interface AppBarProps
   wordmark?: string;
   links?: AppBarLink[];
   menuItems?: AppBarMenuItem[];
-  menuLabel?: string;
+  menuLabel?: ReactNode;
   accountButton?: ReactNode;
+  onAccountButtonClick?: () => void;
   position?: 'fixed' | 'absolute' | 'sticky' | 'static' | 'relative';
   elevation?: number;
   variant?: 'primary' | 'transparent' | 'dark' | 'surface';

@@ -18,7 +18,7 @@ export interface MetricSeries {
    * Index signature to match BarChartDataItem
    * Additional properties can be added for custom segments
    */
-  [key: string]: number | string;
+  [key: string]: number | string | undefined;
 }
 
 /**

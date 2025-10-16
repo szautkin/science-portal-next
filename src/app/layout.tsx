@@ -3,6 +3,8 @@ import { ThemeProvider } from '@/app/theme/ThemeContext';
 import { SkipNavigation } from '@/app/components/SkipNavigation/SkipNavigation';
 import { ClientErrorBoundary } from '@/app/components/ClientErrorBoundary';
 import { AuthProvider } from '@/app/providers/AuthProvider';
+import { QueryProvider } from '@/lib/providers/QueryProvider';
+import { NuqsProvider } from '@/lib/providers/NuqsProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -18,14 +20,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <ThemeProvider>
-            <ClientErrorBoundary>
-              <SkipNavigation />
-              {children}
-            </ClientErrorBoundary>
-          </ThemeProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <NuqsProvider>
+            <AuthProvider>
+              <ThemeProvider>
+                <ClientErrorBoundary>
+                  <SkipNavigation />
+                  {children}
+                </ClientErrorBoundary>
+              </ThemeProvider>
+            </AuthProvider>
+          </NuqsProvider>
+        </QueryProvider>
       </body>
     </html>
   );

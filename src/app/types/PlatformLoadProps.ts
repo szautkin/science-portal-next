@@ -25,9 +25,9 @@ export interface PlatformLoadData {
     instances: number;
   };
   /**
-   * Last update timestamp
+   * Last update timestamp (string for API responses, Date for client-side)
    */
-  lastUpdate: Date;
+  lastUpdate: string | Date;
 }
 
 /**

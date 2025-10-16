@@ -3,6 +3,7 @@ import { CardProps } from '@mui/material';
 export type SessionType =
   | 'notebook'
   | 'desktop'
+  | 'headless'
   | 'carta'
   | 'contributednotebook'
   | 'contributeddesktop';
@@ -11,9 +12,11 @@ export type SessionStatus =
   | 'Pending'
   | 'Failed'
   | 'Terminating'
+  | 'Error'
   | 'Unknown';
 
 export interface SessionCardProps extends Omit<CardProps, 'onClick'> {
+  id?: string;
   sessionType: SessionType;
   sessionName: string;
   sessionId?: string; // Optional session ID for API calls
@@ -21,11 +24,13 @@ export interface SessionCardProps extends Omit<CardProps, 'onClick'> {
   containerImage: string;
   startedTime: string; // UTC timestamp
   expiresTime: string; // UTC timestamp
-  memoryUsage: string; // e.g., "<none>"
+  memoryUsage?: string; // e.g., "<none>" - optional to match API
   memoryAllocated: string; // e.g., "8G"
-  cpuUsage: string; // e.g., "<none>"
+  cpuUsage?: string; // e.g., "<none>" - optional to match API
   cpuAllocated: string; // e.g., "2"
-  connectUrl: string;
+  connectUrl?: string; // optional to match API
+  requestedRAM?: string;
+  requestedCPU?: string;
   onDelete?: () => void;
   onShowEvents?: () => void;
   onShowLogs?: () => void;

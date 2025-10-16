@@ -170,9 +170,11 @@ const useSessionEvents = (
 
     try {
       const endpoint =
-        eventsEndpoint || `/science-portal/session/${sessionId}?view=events`;
+        eventsEndpoint || `/api/sessions/${sessionId}/logs`;
 
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, {
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch events: ${response.statusText}`);

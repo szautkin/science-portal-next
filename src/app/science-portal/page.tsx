@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { AppBar } from '@/app/components/AppBar/AppBar';
+import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
 import { UserStorageWidget } from '@/app/components/UserStorageWidget/UserStorageWidget';
 import { LaunchFormWidget } from '@/app/components/LaunchFormWidget/LaunchFormWidget';
@@ -173,17 +173,16 @@ export default function SciencePortalPage() {
       }}
     >
       {/* AppBar with Science Portal wordmark */}
-      <AppBar
+      <AppBarWithAuth
         variant="surface"
         position="sticky"
         elevation={0}
         wordmark="Science Portal"
         logoHref="/"
-        menuLabel="Jane Doe"
         logo={<CanfarLogo />}
         links={appBarWithUserMenu.links}
-        menuItems={appBarWithUserMenu.menuItems}
         accountButton={<ThemeToggle size="md" />}
+        showLoginButton={true}
       />
 
       {/* Main content area */}

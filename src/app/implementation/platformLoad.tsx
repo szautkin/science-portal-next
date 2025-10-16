@@ -31,7 +31,10 @@ export const PlatformLoadImpl: React.FC<PlatformLoadProps> = ({
   // Memoized to prevent recalculation on every render
   // Only recalculates when the date actually changes
   const formattedLastUpdate = useMemo(() => {
-    return `last update: ${data.lastUpdate.toISOString().replace('T', ' ').slice(0, -5)} UTC`;
+    const dateStr = typeof data.lastUpdate === 'string'
+      ? data.lastUpdate
+      : data.lastUpdate.toISOString();
+    return `last update: ${dateStr.replace('T', ' ').slice(0, -5)} UTC`;
   }, [data.lastUpdate]);
 
   return (
