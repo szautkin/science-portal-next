@@ -52,6 +52,32 @@ export interface Session {
   requestedCPU?: string;
 }
 
+// SKAHA Stats API Response - raw format from /v1/session?view=stats
+export interface SkahaStatsResponse {
+  instances: {
+    session: number;
+    desktopApp: number;
+    headless: number;
+    total: number;
+  };
+  cores: {
+    requestedCPUCores: number;
+    cpuCoresAvailable: number;
+    maxCPUCores: {
+      cpuCores: number;
+      withRam: string;
+    };
+  };
+  ram: {
+    requestedRAM: string;
+    ramAvailable: string;
+    maxRAM: {
+      ram: string;
+      withCPUCores: number;
+    };
+  };
+}
+
 export interface PlatformLoadMetric {
   name: string;
   used: number;
