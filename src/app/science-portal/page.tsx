@@ -108,6 +108,21 @@ export default function SciencePortalPage() {
     refetchPlatformLoad();
   }, [refetchPlatformLoad]);
 
+  // Provide placeholder data for Platform Load when data is not yet loaded
+  const platformLoadDataOrPlaceholder: PlatformLoadData = useMemo(() => {
+    if (platformLoadData) {
+      return platformLoadData;
+    }
+    // Return placeholder data to show widget while loading
+    return {
+      cpu: { name: 'CPU', used: 0, free: 0 },
+      ram: { name: 'RAM', used: 0, free: 0 },
+      instances: { name: 'Instances', used: 0, free: 0 },
+      maxValues: { cpu: 1, ram: 1, instances: 1 },
+      lastUpdate: new Date().toISOString(),
+    };
+  }, [platformLoadData]);
+
   const footerSections = [
     {
       title: 'Resources',
@@ -194,7 +209,6 @@ export default function SciencePortalPage() {
               <UserStorageWidget
                 isAuthenticated={isAuthenticated}
                 name={authStatus?.user?.username || ''}
-                storageUrl="https://api.canfar.net/storage/"
                 testMode={!isAuthenticated}
               />
             </Box>
@@ -228,13 +242,11 @@ export default function SciencePortalPage() {
                 px: { xs: 1, sm: 2 }, // Add horizontal padding
               }}
             >
-              {platformLoadData && (
-                <PlatformLoad
-                  data={platformLoadData}
-                  isLoading={isLoadingPlatform}
-                  onRefresh={handlePlatformRefresh}
-                />
-              )}
+              <PlatformLoad
+                data={platformLoadDataOrPlaceholder}
+                isLoading={isLoadingPlatform}
+                onRefresh={handlePlatformRefresh}
+              />
             </Box>
           </Box>
         </Container>

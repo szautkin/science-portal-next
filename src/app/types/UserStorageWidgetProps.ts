@@ -25,8 +25,6 @@ export interface UserStorageWidgetProps {
   isAuthenticated?: boolean;
   /** Username for storage requests */
   name?: string;
-  /** Base URL for storage API */
-  storageUrl?: string;
   /** Whether the widget is in a loading state */
   isLoading?: boolean;
   /** Storage data to display */

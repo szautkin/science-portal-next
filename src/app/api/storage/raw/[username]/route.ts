@@ -1,8 +1,8 @@
 /**
  * Storage Raw API Route
  *
- * GET /api/storage/raw/[username]?name= - Get raw storage data (XML) for VOSpace
- * This endpoint is used by userStorageWidget.tsx to fetch raw XML data
+ * GET /api/storage/raw/[username] - Get storage data for VOSpace
+ * This endpoint fetches VOSpace XML and returns parsed JSON
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,29 +12,68 @@ import {
   fetchExternalApi,
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
-import { serverApiConfig } from '@/app/api/lib/server-config';
+
+interface StorageData {
+  size: number;
+  quota: number;
+  date: string;
+  usage: number;
+}
+
+/**
+ * Parse VOSpace XML response to extract storage data
+ */
+function parseVOSpaceXML(xmlText: string): StorageData {
+  // Simple regex-based parsing for server-side (no DOMParser in Node.js)
+  let size = 0;
+  let quota = 0;
+  let date = new Date().toISOString();
+
+  // Match property elements with their URIs and values
+  const propertyRegex = /<vos:property[^>]*uri="([^"]*)"[^>]*>([\s\S]*?)<\/vos:property>/g;
+  let match;
+
+  while ((match = propertyRegex.exec(xmlText)) !== null) {
+    const uri = match[1];
+    const value = match[2].trim();
+
+    if (uri.includes('vospace/core#length')) {
+      size = parseInt(value, 10) || 0;
+    } else if (uri.includes('vospace/core#quota')) {
+      quota = parseInt(value, 10) || 0;
+    } else if (uri.includes('vospace/core#date')) {
+      date = value;
+    }
+  }
+
+  const usage = quota > 0 ? (size / quota) * 100 : 0;
+
+  return { size, quota, date, usage };
+}
 
 export const GET = withErrorHandling(async (
   request: NextRequest,
   { params }: { params: { username: string } }
 ) => {
   const username = params.username;
-  const searchParams = request.nextUrl.searchParams;
-  const name = searchParams.get('name') || '';
 
   if (!username) {
     return errorResponse('Username is required', 400);
   }
 
-  if (!name) {
-    return errorResponse('Name parameter is required', 400);
-  }
-
   const authHeaders = forwardAuthHeader(request);
-  const storageUrl = serverApiConfig.storage.baseUrl;
+  // Use SERVICE_STORAGE_API with username appended
+  const storageBaseUrl = process.env.SERVICE_STORAGE_API || '';
+  const storageUrl = `${storageBaseUrl}${username}`;
+
+  console.log('[Storage API] Fetching storage data:', {
+    username,
+    url: storageUrl,
+    baseUrl: storageBaseUrl,
+  });
 
   const response = await fetchExternalApi(
-    `${storageUrl}${name}`,
+    storageUrl,
     {
       method: 'GET',
       headers: {
@@ -42,20 +81,46 @@ export const GET = withErrorHandling(async (
         'Accept': 'application/xml',
       },
     },
-    serverApiConfig.storage.timeout
+    30000
   );
 
+  console.log('[Storage API] Fetch response:', {
+    username,
+    status: response.status,
+    ok: response.ok,
+    statusText: response.statusText,
+  });
+
   if (!response.ok) {
+    console.error('[Storage API] Failed to fetch storage data:', {
+      username,
+      status: response.status,
+      statusText: response.statusText,
+    });
     return errorResponse('Failed to fetch storage data', response.status);
   }
 
   const xmlText = await response.text();
 
-  // Create response with XML content type
-  return new NextResponse(xmlText, {
+  console.log('[Storage API] Raw XML response (first 500 chars):', {
+    username,
+    xmlPreview: xmlText.substring(0, 500),
+    totalLength: xmlText.length,
+  });
+
+  // Parse the XML and extract storage data
+  const storageData = parseVOSpaceXML(xmlText);
+
+  console.log('[Storage API] Parsed storage data:', {
+    username,
+    data: storageData,
+  });
+
+  // Return JSON response
+  return NextResponse.json(storageData, {
     status: 200,
     headers: {
-      'Content-Type': 'application/xml',
+      'Content-Type': 'application/json',
     },
   });
 });

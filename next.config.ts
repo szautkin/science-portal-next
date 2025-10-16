@@ -2,7 +2,6 @@ import type { NextConfig } from 'next';
 
 // Validate required environment variables at build time
 const requiredEnvVars = [
-  'NEXT_PUBLIC_SERVICE_STORAGE_API',
   'NEXT_PUBLIC_LOGIN_API',
   'NEXT_PUBLIC_SKAHA_API',
 ] as const;
@@ -23,7 +22,6 @@ const nextConfig: NextConfig = {
   },
   // Expose environment variables to the client
   env: {
-    SERVICE_STORAGE_API: process.env.NEXT_PUBLIC_SERVICE_STORAGE_API,
     LOGIN_API: process.env.NEXT_PUBLIC_LOGIN_API,
     SKAHA_API: process.env.NEXT_PUBLIC_SKAHA_API,
     API_TIMEOUT: process.env.NEXT_PUBLIC_API_TIMEOUT || '30000',

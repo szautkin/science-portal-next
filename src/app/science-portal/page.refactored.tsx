@@ -149,7 +149,6 @@ export default function SciencePortalPage() {
               <UserStorageWidget
                 isAuthenticated={true}
                 name="janedoe"
-                storageUrl="https://api.canfar.net/storage/"
                 testMode={true}
               />
             </Box>

@@ -137,7 +137,6 @@ export const UserStorageWidgetImpl = React.forwardRef<
       title = 'User Home Storage',
       isAuthenticated = false,
       name,
-      storageUrl,
       isLoading = false,
       data: externalData,
       errorMessage,
@@ -213,15 +212,30 @@ export const UserStorageWidgetImpl = React.forwardRef<
 
     // Internal fetch function
     const fetchStorageData = useCallback(async () => {
-      if (!storageUrl || !name || name === 'Login') return;
+      if (!name || name === 'Login') return;
 
       setInternalLoading(true);
       setInternalError(undefined);
 
       try {
-        const response = await fetch(`/api/storage/raw/${name}?name=${encodeURIComponent(name)}`, {
-          headers: { Accept: 'application/xml' },
+        // Use server-side API route to avoid CORS issues
+        const url = `/api/storage/raw/${name}`;
+
+        console.log('[UserStorageWidget] Fetching storage data:', {
+          username: name,
+          url,
+        });
+
+        const response = await fetch(url, {
+          headers: { Accept: 'application/json' },
           credentials: 'include',
+        });
+
+        console.log('[UserStorageWidget] Fetch response:', {
+          username: name,
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText,
         });
 
         if (!response.ok) {
@@ -229,38 +243,25 @@ export const UserStorageWidgetImpl = React.forwardRef<
           return;
         }
 
-        const xmlString = await response.text();
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(xmlString, 'text/xml');
+        const parsedData: StorageData = await response.json();
 
-        // Parse the XML data (simplified version - you'd need the actual parseVospaceXML utility)
-        const sizeElement = xml.querySelector('size');
-        const quotaElement = xml.querySelector('quota');
-        const dateElement = xml.querySelector('date');
-
-        const size = sizeElement
-          ? parseInt(sizeElement.textContent || '0', 10)
-          : 0;
-        const quota = quotaElement
-          ? parseInt(quotaElement.textContent || '0', 10)
-          : 0;
-        const usage = quota > 0 ? (size / quota) * 100 : 0;
-
-        const parsedData: StorageData = {
-          size,
-          quota,
-          date: dateElement?.textContent || new Date().toISOString(),
-          usage,
-        };
+        console.log('[UserStorageWidget] Received storage data:', {
+          username: name,
+          data: parsedData,
+        });
 
         setInternalData(parsedData);
       } catch (err) {
-        console.error('Storage data fetch error:', err);
+        console.error('[UserStorageWidget] Storage data fetch error:', {
+          username: name,
+          error: err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
         setInternalError('Failed to fetch storage data');
       } finally {
         setInternalLoading(false);
       }
-    }, [storageUrl, name]);
+    }, [name]);
 
     const handleRefresh = useCallback(() => {
       if (onRefresh) {
