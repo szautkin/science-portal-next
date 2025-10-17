@@ -65,6 +65,31 @@ const getStatusColor = (
   }
 };
 
+/**
+ * Extract project and image name from full container image path
+ * Example: "images.canfar.net/skaha/firefly:2025.2" -> "skaha/firefly:2025.2"
+ */
+const getShortImageName = (fullImagePath: string): string => {
+  // Split by "/" and take everything after the first part (registry host)
+  const parts = fullImagePath.split('/');
+  if (parts.length > 1) {
+    // Remove the first part (registry host) and join the rest
+    return parts.slice(1).join('/');
+  }
+  // If no "/" found, return as-is
+  return fullImagePath;
+};
+
+/**
+ * Format timestamp to remove seconds and 'Z', and replace 'T' with space
+ * Example: "2025-10-17T15:03:29Z" -> "2025-10-17 15:03"
+ */
+const formatTimestamp = (timestamp: string): string => {
+  // Remove seconds and 'Z' from ISO timestamp, replace 'T' with space
+  // Format: YYYY-MM-DDTHH:MM:SSZ -> YYYY-MM-DD HH:MM
+  return timestamp.replace(/:\d{2}Z?\s*$/, '').replace('Z', '').replace('T', ' ');
+};
+
 export const SessionCardImpl = React.forwardRef<
   HTMLDivElement,
   SessionCardProps
@@ -441,13 +466,14 @@ export const SessionCardImpl = React.forwardRef<
                   component="span"
                   sx={{
                     flexShrink: 0,
+                    mr: 1,
                     [theme.breakpoints.down('sm')]: {
                       fontSize: theme.typography.caption.fontSize,
                       marginBottom: '2px',
                     },
                   }}
                 >
-                  Container:{' '}
+                  Container:
                 </Typography>
                 <Typography
                   variant="body2"
@@ -458,44 +484,42 @@ export const SessionCardImpl = React.forwardRef<
                     whiteSpace: 'nowrap',
                     minWidth: 0,
                     flex: 1,
+                    fontWeight: theme.typography.fontWeightBold,
                     [theme.breakpoints.down('sm')]: {
                       fontSize: theme.typography.caption.fontSize,
                     },
                   }}
                   title={containerImage} // Show full text on hover
                 >
-                  {containerImage}
+                  {getShortImageName(containerImage)}
                 </Typography>
               </Box>
 
               <Box
                 display="flex"
-                gap={theme.spacing(3)}
-                sx={{
-                  [theme.breakpoints.down('sm')]: {
-                    flexDirection: 'column',
-                    gap: theme.spacing(1),
-                  },
-                }}
+                flexDirection="column"
+                gap={theme.spacing(0.5)}
               >
                 <Box sx={{ minWidth: 0 }}>
                   <Typography
                     variant="body2"
                     color="text.secondary"
                     component="span"
+                    sx={{ mr: 1 }}
                   >
-                    Started:{' '}
+                    Started:
                   </Typography>
                   <Typography
                     variant="body2"
                     component="span"
                     sx={{
+                      fontWeight: theme.typography.fontWeightBold,
                       [theme.breakpoints.down('sm')]: {
                         fontSize: theme.typography.caption.fontSize,
                       },
                     }}
                   >
-                    {startedTime} UTC
+                    {formatTimestamp(startedTime)} UTC
                   </Typography>
                 </Box>
                 <Box sx={{ minWidth: 0 }}>
@@ -503,19 +527,21 @@ export const SessionCardImpl = React.forwardRef<
                     variant="body2"
                     color="text.secondary"
                     component="span"
+                    sx={{ mr: 1 }}
                   >
-                    Expires:{' '}
+                    Expires:
                   </Typography>
                   <Typography
                     variant="body2"
                     component="span"
                     sx={{
+                      fontWeight: theme.typography.fontWeightBold,
                       [theme.breakpoints.down('sm')]: {
                         fontSize: theme.typography.caption.fontSize,
                       },
                     }}
                   >
-                    {expiresTime} UTC
+                    {formatTimestamp(expiresTime)} UTC
                   </Typography>
                 </Box>
               </Box>
@@ -547,18 +573,20 @@ export const SessionCardImpl = React.forwardRef<
                     component="span"
                     sx={{
                       flexShrink: 0,
+                      mr: 1,
                       [theme.breakpoints.down('sm')]: {
                         fontSize: theme.typography.caption.fontSize,
                         marginBottom: '2px',
                       },
                     }}
                   >
-                    Memory:{' '}
+                    Memory:
                   </Typography>
                   <Typography
                     variant="body2"
                     component="span"
                     sx={{
+                      fontWeight: theme.typography.fontWeightBold,
                       [theme.breakpoints.down('sm')]: {
                         fontSize: theme.typography.caption.fontSize,
                       },
@@ -584,18 +612,20 @@ export const SessionCardImpl = React.forwardRef<
                     component="span"
                     sx={{
                       flexShrink: 0,
+                      mr: 1,
                       [theme.breakpoints.down('sm')]: {
                         fontSize: theme.typography.caption.fontSize,
                         marginBottom: '2px',
                       },
                     }}
                   >
-                    CPU:{' '}
+                    CPU:
                   </Typography>
                   <Typography
                     variant="body2"
                     component="span"
                     sx={{
+                      fontWeight: theme.typography.fontWeightBold,
                       [theme.breakpoints.down('sm')]: {
                         fontSize: theme.typography.caption.fontSize,
                       },

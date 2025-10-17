@@ -24,14 +24,18 @@ export interface SessionSettings {
   memory: number;
 }
 
+import type { ImagesByTypeAndProject, Session } from '@/lib/api/skaha';
+
 export interface SessionLaunchFormProps {
   onLaunch?: (data: SessionFormData) => void | Promise<void>;
   onReset?: () => void;
-  projects?: string[];
-  containerImages?: string[];
+  onSessionTypeChange?: (sessionType: string) => void;
+  imagesByType?: ImagesByTypeAndProject;
+  repositoryHosts?: string[];
   memoryOptions?: number[];
   coreOptions?: number[];
   defaultValues?: Partial<SessionFormData>;
   isLoading?: boolean;
   errorMessage?: string | null;
+  activeSessions?: Session[];
 }

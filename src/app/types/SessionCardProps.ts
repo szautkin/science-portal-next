@@ -5,6 +5,8 @@ export type SessionType =
   | 'desktop'
   | 'headless'
   | 'carta'
+  | 'contributed'
+  | 'firefly'
   | 'contributednotebook'
   | 'contributeddesktop';
 export type SessionStatus =

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Paper,
   Typography,
@@ -19,6 +19,9 @@ import { SessionLaunchForm } from '@/app/components/SessionLaunchForm/SessionLau
 import { SessionRequestModal } from '@/app/components/SessionRequestModal/SessionRequestModal';
 import { SessionFormData } from '@/app/types/SessionLaunchFormProps';
 import { SessionRequestStatus } from '@/app/types/SessionRequestModalProps';
+import { useContainerImages, useImageRepositories } from '@/lib/hooks/useImages';
+import { useAuthStatus } from '@/lib/hooks/useAuth';
+import { useSessions } from '@/lib/hooks/useSessions';
 
 export function LaunchFormWidgetImpl({
   isLoading = false,
@@ -30,11 +33,30 @@ export function LaunchFormWidgetImpl({
   ...sessionLaunchFormProps
 }: LaunchFormWidgetProps) {
   const theme = useTheme();
+
+  // Get auth status
+  const { data: authStatus } = useAuthStatus();
+  const isAuthenticated = authStatus?.authenticated ?? false;
+
+  // Fetch images and repositories from API
+  const { data: imagesByType = {}, isLoading: isLoadingImages, refetch: refetchImages } = useContainerImages(isAuthenticated);
+  const { data: imageRepositories = [], isLoading: isLoadingRepositories } = useImageRepositories(isAuthenticated);
+
+  // Fetch active sessions to calculate the next session name
+  const { data: activeSessions = [] } = useSessions(isAuthenticated);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [requestStatus, setRequestStatus] =
     useState<SessionRequestStatus>('requesting');
   const [requestError, setRequestError] = useState<string | undefined>();
   const [sessionData, setSessionData] = useState<SessionFormData | null>(null);
+  const [selectedSessionType, setSelectedSessionType] = useState<string>('notebook');
+  const [launchedSession, setLaunchedSession] = useState<any>(null);
+
+  // Extract repository hosts for dropdown
+  const repositoryHosts = useMemo(() => {
+    return imageRepositories.map(repo => repo.host);
+  }, [imageRepositories]);
 
   const handleLaunch = useCallback(
     async (formData: SessionFormData) => {
@@ -42,20 +64,69 @@ export function LaunchFormWidgetImpl({
       setModalOpen(true);
       setRequestStatus('requesting');
       setRequestError(undefined);
+      setLaunchedSession(null);
 
-      // Simulate the request process
       try {
+        // Import launchSession and getSession from skaha API
+        const { launchSession, getSession } = await import('@/lib/api/skaha');
+
+        // Determine which image to use
+        const imageToUse = formData.image
+          ? `${formData.repositoryHost}/${formData.image}`
+          : formData.containerImage;
+
+        // Build launch parameters
+        const launchParams = {
+          sessionType: formData.type,
+          sessionName: formData.sessionName,
+          containerImage: imageToUse,
+          cores: formData.cores,
+          ram: formData.memory,
+        };
+
+        // Launch the session and get the session ID
+        const initialSession = await launchSession(launchParams);
+
         // Call the original onLaunch if provided
         if (sessionLaunchFormProps.onLaunch) {
           await sessionLaunchFormProps.onLaunch(formData);
         }
 
-        // Simulate requesting phase
-        await new Promise((resolve) => setTimeout(resolve, 1500));
         setRequestStatus('provisioning');
 
-        // Simulate provisioning phase
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+        // Poll for session details to get the connectURL and status
+        let attempts = 0;
+        const maxAttempts = 10; // Try for about 10 seconds
+        let sessionDetails = initialSession;
+
+        while (attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          try {
+            sessionDetails = await getSession(initialSession.id);
+
+            // If session is Running and has a connectUrl, we're done
+            if (sessionDetails.status === 'Running' && sessionDetails.connectUrl) {
+              setLaunchedSession(sessionDetails);
+              setRequestStatus('success');
+              return;
+            }
+
+            // If session failed, show error
+            if (sessionDetails.status === 'Failed' || sessionDetails.status === 'Error') {
+              setRequestStatus('error');
+              setRequestError('Session failed to start. Please try again.');
+              return;
+            }
+          } catch (fetchError) {
+            console.warn('Failed to fetch session details, retrying...', fetchError);
+          }
+
+          attempts++;
+        }
+
+        // If we've exhausted attempts, session is still pending
+        setLaunchedSession(sessionDetails);
         setRequestStatus('success');
       } catch (error) {
         setRequestStatus('error');
@@ -78,10 +149,14 @@ export function LaunchFormWidgetImpl({
   }, [sessionData, handleLaunch]);
 
   const handleConnect = useCallback(() => {
-    // In a real implementation, this would navigate to the session URL
-    console.log('Connecting to session:', sessionData);
+    // Open the session in a new tab using the connectURL from the API response
+    if (launchedSession?.connectUrl) {
+      window.open(launchedSession.connectUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      console.error('No connectURL available for session');
+    }
     setModalOpen(false);
-  }, [sessionData]);
+  }, [launchedSession]);
 
   return (
     <Paper
@@ -202,8 +277,12 @@ export function LaunchFormWidgetImpl({
       <Box sx={{ marginBottom: theme.spacing(2) }}>
         <SessionLaunchForm
           {...sessionLaunchFormProps}
+          imagesByType={imagesByType}
           onLaunch={handleLaunch}
-          isLoading={isLoading}
+          isLoading={isLoading || isLoadingImages || isLoadingRepositories}
+          onSessionTypeChange={setSelectedSessionType}
+          repositoryHosts={repositoryHosts}
+          activeSessions={activeSessions}
         />
       </Box>
 
@@ -214,13 +293,13 @@ export function LaunchFormWidgetImpl({
         sessionType={sessionData?.type || ''}
         status={requestStatus}
         errorMessage={requestError}
-        sessionUrl={
-          requestStatus === 'success'
-            ? `/sessions/${sessionData?.type}/${sessionData?.sessionName}`
+        sessionUrl={launchedSession?.connectUrl}
+        onClose={handleModalClose}
+        onConnect={
+          launchedSession?.status === 'Running' && launchedSession?.connectUrl
+            ? handleConnect
             : undefined
         }
-        onClose={handleModalClose}
-        onConnect={handleConnect}
         onRetry={handleRetry}
       />
     </Paper>

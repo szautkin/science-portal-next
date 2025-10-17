@@ -84,15 +84,41 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     );
   }
 
-  if (!body.cores || !body.ram) {
-    logger.logError(400, 'Missing required fields: cores, ram');
-    return errorResponse(
-      'Missing required fields: cores, ram',
-      400
-    );
+  // Build form data for SKAHA API
+  const formData = new URLSearchParams();
+  formData.append('name', body.sessionName);
+  formData.append('image', body.containerImage);
+
+  // Add type if provided (for non-headless sessions)
+  if (body.sessionType && body.sessionType !== 'headless') {
+    formData.append('type', body.sessionType);
+  }
+
+  // Add cores if provided
+  if (body.cores) {
+    formData.append('cores', body.cores.toString());
+  }
+
+  // Add ram if provided
+  if (body.ram) {
+    formData.append('ram', body.ram.toString());
+  }
+
+  // Add cmd if provided (for headless sessions)
+  if (body.cmd) {
+    formData.append('cmd', body.cmd);
+  }
+
+  // Add env variables if provided (for headless sessions)
+  if (body.env) {
+    Object.entries(body.env).forEach(([key, value]) => {
+      formData.append('env', `${key}=${value}`);
+    });
   }
 
   const authHeaders = forwardAuthHeader(request);
+
+  logger.info(`Launching session: ${body.sessionName} with image: ${body.containerImage}`);
 
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v1/session`,
@@ -100,10 +126,10 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
       method: 'POST',
       headers: {
         ...authHeaders,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: formData.toString(),
     },
     serverApiConfig.skaha.timeout
   );
@@ -118,8 +144,16 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     );
   }
 
-  const session: SkahaSessionResponse = await response.json();
-  logger.info(`Successfully launched session: ${session.name}`);
-  logger.logSuccess(201, { sessionId: session.id, sessionName: session.name });
-  return successResponse(session, 201);
+  // SKAHA returns the session ID in the response body as text
+  const sessionId = await response.text();
+  logger.info(`Successfully launched session: ${body.sessionName}, ID: ${sessionId}`);
+  logger.logSuccess(201, { sessionId, sessionName: body.sessionName });
+
+  // Return the session ID and basic info
+  return successResponse({
+    id: sessionId,
+    name: body.sessionName,
+    type: body.sessionType,
+    image: body.containerImage
+  }, 201);
 });

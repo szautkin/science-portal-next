@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Box,
   Tabs,
@@ -21,13 +21,16 @@ import {
   Typography,
 } from '@mui/material';
 import { HelpOutline as HelpOutlineIcon } from '@mui/icons-material';
+import { useQueryStates, parseAsString, parseAsInteger } from 'nuqs';
 import { Select } from '@/app/components/Select/Select';
 import { TextField } from '@/app/components/TextField/TextField';
 import { Card, CardContent } from '@/app/components/Card';
 import {
   SessionLaunchFormProps,
   SessionFormData,
+  SessionType,
 } from '@/app/types/SessionLaunchFormProps';
+import { getProjectNames } from '@/lib/utils/image-parser';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -52,13 +55,6 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const DEFAULT_PROJECTS = ['alinga', 'skaha'];
-
-const DEFAULT_IMAGES = [
-  'images-rc.canfar.net/skaha/skaha-notebook:22.09-test',
-  'images-rc.canfar.net/skaha/skirt-notebook:latest',
-];
-
 const DEFAULT_MEMORY_OPTIONS = [
   1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32, 36, 40, 44, 48, 56, 64,
   80, 92, 112, 128, 140, 170, 192,
@@ -73,71 +69,182 @@ export const SessionLaunchFormImpl = React.forwardRef<
     {
       onLaunch,
       onReset,
-      projects = DEFAULT_PROJECTS,
-      containerImages = DEFAULT_IMAGES,
+      onSessionTypeChange,
+      imagesByType = {},
+      repositoryHosts = ['images-rc.canfar.net'],
       memoryOptions,
       coreOptions,
       defaultValues = {
         type: 'notebook',
-        project: 'skaha',
-        containerImage: DEFAULT_IMAGES[0],
+        project: '',
+        containerImage: '',
         sessionName: 'notebook1',
         memory: 8,
         cores: 2,
       },
       isLoading = false,
       errorMessage,
+      activeSessions = [],
     },
     ref
   ) => {
     const theme = useTheme();
-    const [tabValue, setTabValue] = useState(0);
-    const [resourceType, setResourceType] = useState<'flexible' | 'fixed'>(
-      'flexible'
+
+    // URL query parameters for deep linking
+    const [urlParams, setUrlParams] = useQueryStates(
+      {
+        tab: parseAsInteger.withDefault(0), // 0 = Standard, 1 = Advanced
+        type: parseAsString.withDefault(defaultValues.type || 'notebook'),
+        project: parseAsString.withDefault(defaultValues.project || ''),
+        image: parseAsString.withDefault(defaultValues.containerImage || ''),
+        name: parseAsString.withDefault(defaultValues.sessionName || ''),
+        memory: parseAsInteger, // Nullable - only present for Fixed resources
+        cores: parseAsInteger, // Nullable - only present for Fixed resources
+      },
+      {
+        history: 'replace', // Use replace to avoid cluttering browser history
+      }
     );
+
+    // Initialize tab from URL parameter
+    const [tabValue, setTabValue] = useState(urlParams.tab);
+
+    // Initialize resource type based on presence of cores/memory in URL
+    const initialResourceType = (urlParams.cores !== null || urlParams.memory !== null) ? 'fixed' : 'flexible';
+    const [resourceType, setResourceType] = useState<'flexible' | 'fixed'>(initialResourceType);
+
     const [formData, setFormData] = useState<SessionFormData>({
-      type: defaultValues.type || 'notebook',
-      project: defaultValues.project || 'skaha',
-      containerImage: defaultValues.containerImage || DEFAULT_IMAGES[0],
-      sessionName: defaultValues.sessionName || 'notebook1',
-      memory: defaultValues.memory || 8,
-      cores: defaultValues.cores || 2,
+      type: urlParams.type as SessionType,
+      project: urlParams.project,
+      containerImage: urlParams.image,
+      sessionName: urlParams.name || defaultValues.sessionName || 'notebook1',
+      memory: urlParams.memory ?? defaultValues.memory ?? 8,
+      cores: urlParams.cores ?? defaultValues.cores ?? 2,
       // Advanced tab fields
-      repositoryHost: 'images-rc.canfar.net',
+      repositoryHost: repositoryHosts[0] || 'images-rc.canfar.net',
       image: '',
-      repositoryAuthUsername: 'janedoe',
+      repositoryAuthUsername: '',
       repositoryAuthSecret: '',
     });
 
+    // Get available projects for the selected session type
+    const availableProjects = useMemo(() => {
+      const imagesForType = imagesByType[formData.type];
+      if (!imagesForType) return [];
+      return getProjectNames(imagesForType);
+    }, [imagesByType, formData.type]);
+
+    // Get available images for the selected type and project
+    const availableImages = useMemo(() => {
+      const imagesForType = imagesByType[formData.type];
+      if (!imagesForType || !formData.project) return [];
+      const imagesForProject = imagesForType[formData.project];
+      return imagesForProject || [];
+    }, [imagesByType, formData.type, formData.project]);
+
+    // Check if the selected session type supports resource configuration
+    // firefly and desktop don't support custom resource allocation
+    const supportsResourceConfig = useMemo(() => {
+      return formData.type !== 'firefly' && formData.type !== 'desktop';
+    }, [formData.type]);
+
+    // Generate the next available session name based on active sessions
+    const generateSessionName = useCallback((sessionType: string): string => {
+      // Count all active sessions (regardless of type) to determine the next counter
+      const totalActiveSessions = activeSessions.length;
+
+      // The counter starts at totalActiveSessions + 1
+      const counter = totalActiveSessions + 1;
+
+      return `${sessionType}${counter}`;
+    }, [activeSessions]);
+
+    // Update session name when active sessions change
+    useEffect(() => {
+      const newSessionName = generateSessionName(formData.type);
+      setFormData((prev) => ({
+        ...prev,
+        sessionName: newSessionName,
+      }));
+      setUrlParams({ name: newSessionName });
+    }, [activeSessions, generateSessionName, formData.type, setUrlParams]);
+
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
       setTabValue(newValue);
+      setUrlParams({ tab: newValue });
     };
 
     const handleFieldChange = useCallback(
       (field: keyof SessionFormData) =>
         (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+          const value = field === 'memory' || field === 'cores'
+            ? Number(event.target.value)
+            : event.target.value;
+
           setFormData((prev) => ({
             ...prev,
-            [field]:
-              field === 'memory' || field === 'cores'
-                ? Number(event.target.value)
-                : event.target.value,
+            [field]: value,
           }));
+
+          // Sync session name to URL
+          if (field === 'sessionName') {
+            setUrlParams({ name: value as string });
+          }
         },
-      []
+      [setUrlParams]
     );
 
     const handleSelectChange = useCallback(
       (field: keyof SessionFormData) => (event: SelectChangeEvent) => {
-        setFormData((prev) => ({
-          ...prev,
-          [field]:
-            field === 'memory' || field === 'cores'
-              ? Number(event.target.value)
-              : event.target.value,
-        }));
+        const value = field === 'memory' || field === 'cores'
+          ? Number(event.target.value)
+          : event.target.value;
+
+        setFormData((prev) => {
+          const newData = { ...prev, [field]: value };
+
+          // Reset dependent fields when session type changes
+          if (field === 'type' && typeof value === 'string') {
+            newData.project = '';
+            newData.containerImage = '';
+            // Automatically update session name based on the new type
+            newData.sessionName = generateSessionName(value);
+          }
+
+          // Reset container image when project changes
+          if (field === 'project') {
+            newData.containerImage = '';
+          }
+
+          return newData;
+        });
+
+        // Update URL parameters
+        if (field === 'type') {
+          const newType = value as string;
+          // If switching to firefly or desktop, clear resource params
+          if (newType === 'firefly' || newType === 'desktop') {
+            setUrlParams({ type: newType, project: '', image: '', cores: null, memory: null });
+            setResourceType('flexible'); // Reset to flexible
+          } else {
+            setUrlParams({ type: newType, project: '', image: '' });
+          }
+        } else if (field === 'project') {
+          setUrlParams({ project: value as string, image: '' });
+        } else if (field === 'containerImage') {
+          setUrlParams({ image: value as string });
+        } else if (field === 'memory') {
+          setUrlParams({ memory: value as number });
+        } else if (field === 'cores') {
+          setUrlParams({ cores: value as number });
+        }
+
+        // Notify parent component when session type changes
+        if (field === 'type' && onSessionTypeChange && typeof value === 'string') {
+          onSessionTypeChange(value);
+        }
       },
-      []
+      [onSessionTypeChange, generateSessionName, setUrlParams]
     );
 
     const handleSubmit = useCallback(
@@ -153,27 +260,49 @@ export const SessionLaunchFormImpl = React.forwardRef<
     const handleReset = useCallback(() => {
       setFormData({
         type: defaultValues.type || 'notebook',
-        project: defaultValues.project || 'skaha',
-        containerImage: defaultValues.containerImage || DEFAULT_IMAGES[0],
+        project: defaultValues.project || '',
+        containerImage: defaultValues.containerImage || '',
         sessionName: defaultValues.sessionName || 'notebook1',
         memory: defaultValues.memory || 8,
         cores: defaultValues.cores || 2,
         // Advanced tab fields
-        repositoryHost: 'images-rc.canfar.net',
+        repositoryHost: repositoryHosts[0] || 'images-rc.canfar.net',
         image: '',
-        repositoryAuthUsername: 'janedoe',
+        repositoryAuthUsername: '',
         repositoryAuthSecret: '',
       });
       setResourceType('flexible');
+      setTabValue(0);
+
+      // Reset URL parameters to defaults
+      setUrlParams({
+        tab: 0,
+        type: defaultValues.type || 'notebook',
+        project: defaultValues.project || '',
+        image: defaultValues.containerImage || '',
+        name: defaultValues.sessionName || 'notebook1',
+        cores: null, // Flexible = no cores/memory in URL
+        memory: null,
+      });
+
       if (onReset) {
         onReset();
       }
-    }, [defaultValues, onReset]);
+    }, [defaultValues, onReset, repositoryHosts, setUrlParams]);
 
     const handleResourceTypeChange = (
       event: React.ChangeEvent<HTMLInputElement>
     ) => {
-      setResourceType(event.target.value as 'flexible' | 'fixed');
+      const newResourceType = event.target.value as 'flexible' | 'fixed';
+      setResourceType(newResourceType);
+
+      // If switching to Flexible, unset cores and memory from URL
+      if (newResourceType === 'flexible') {
+        setUrlParams({ cores: null, memory: null });
+      } else {
+        // If switching to Fixed, set the current form values to URL
+        setUrlParams({ cores: formData.cores, memory: formData.memory });
+      }
     };
 
     // Helper component for the help icon tooltip
@@ -316,14 +445,14 @@ export const SessionLaunchFormImpl = React.forwardRef<
                           typeof Select
                         >['onChange']
                       }
-                      disabled={isLoading}
+                      disabled={isLoading || availableProjects.length === 0}
                       fullWidth
                       size="sm"
                     >
                       <MenuItem value="">
                         <em>Select project</em>
                       </MenuItem>
-                      {projects.map((project) => (
+                      {availableProjects.map((project) => (
                         <MenuItem key={project} value={project}>
                           {project}
                         </MenuItem>
@@ -356,13 +485,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                           'containerImage'
                         ) as React.ComponentProps<typeof Select>['onChange']
                       }
-                      disabled={isLoading}
+                      disabled={isLoading || !formData.project || availableImages.length === 0}
                       fullWidth
                       size="sm"
                     >
-                      {containerImages.map((image) => (
-                        <MenuItem key={image} value={image}>
-                          {image.replace('images-rc.canfar.net/skaha/', '')}
+                      <MenuItem value="">
+                        <em>Select image</em>
+                      </MenuItem>
+                      {availableImages.map((image) => (
+                        <MenuItem key={image.id} value={image.id}>
+                          {image.label}
                         </MenuItem>
                       ))}
                     </Select>
@@ -398,48 +530,50 @@ export const SessionLaunchFormImpl = React.forwardRef<
                   </Grid>
                 </Grid>
 
-                {/* Resources field */}
-                <Grid container alignItems="center" spacing={2}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <FormLabel
-                      sx={{
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      resources
-                    </FormLabel>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 8 }}>
-                    <FormControl component="fieldset">
-                      <RadioGroup
-                        row
-                        value={resourceType}
-                        onChange={handleResourceTypeChange}
+                {/* Resources field - only show for session types that support it */}
+                {supportsResourceConfig && (
+                  <Grid container alignItems="center" spacing={2}>
+                    <Grid size={{ xs: 12, sm: 4 }}>
+                      <FormLabel
+                        sx={{
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
                       >
-                        <FormControlLabel
-                          value="flexible"
-                          control={<Radio size="small" />}
-                          label="Flexible"
-                          disabled={isLoading}
-                          sx={{ mr: 1 }}
-                        />
-                        <HelpIcon title="Flexible resources allow dynamic allocation based on availability" />
-                        <FormControlLabel
-                          value="fixed"
-                          control={<Radio size="small" />}
-                          label="Fixed"
-                          disabled={isLoading}
-                          sx={{ ml: 2, mr: 1 }}
-                        />
-                        <HelpIcon title="Fixed resources guarantee specific CPU and memory allocation" />
-                      </RadioGroup>
-                    </FormControl>
+                        resources
+                      </FormLabel>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 8 }}>
+                      <FormControl component="fieldset">
+                        <RadioGroup
+                          row
+                          value={resourceType}
+                          onChange={handleResourceTypeChange}
+                        >
+                          <FormControlLabel
+                            value="flexible"
+                            control={<Radio size="small" />}
+                            label="Flexible"
+                            disabled={isLoading}
+                            sx={{ mr: 1 }}
+                          />
+                          <HelpIcon title="Flexible resources allow dynamic allocation based on availability" />
+                          <FormControlLabel
+                            value="fixed"
+                            control={<Radio size="small" />}
+                            label="Fixed"
+                            disabled={isLoading}
+                            sx={{ ml: 2, mr: 1 }}
+                          />
+                          <HelpIcon title="Fixed resources guarantee specific CPU and memory allocation" />
+                        </RadioGroup>
+                      </FormControl>
+                    </Grid>
                   </Grid>
-                </Grid>
+                )}
 
-                {/* Conditional Memory and CPU fields when Fixed is selected */}
-                {resourceType === 'fixed' && (
+                {/* Conditional Memory and CPU fields when Fixed is selected and supported */}
+                {supportsResourceConfig && resourceType === 'fixed' && (
                   <Grid container alignItems="center" spacing={2}>
                     <Grid size={{ xs: 12, sm: 4 }}>
                       {/* Empty grid for alignment */}
@@ -509,7 +643,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
               </Box>
 
               {/* Buttons */}
-              <Grid container spacing={2}>
+              <Grid container spacing={2} sx={{ mt: theme.spacing(3) }}>
                 <Grid size={{ xs: 12, sm: 4 }}>
                   {/* Empty grid for alignment */}
                 </Grid>
@@ -519,7 +653,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
                       type="submit"
                       variant="contained"
                       size="small"
-                      disabled={isLoading || !formData.project}
+                      disabled={isLoading || !formData.project || !formData.containerImage}
                     >
                       Launch
                     </Button>
@@ -574,13 +708,24 @@ export const SessionLaunchFormImpl = React.forwardRef<
                         </FormLabel>
                       </Grid>
                       <Grid size={{ xs: 12, sm: 3 }}>
-                        <TextField
+                        <Select
                           id="repository-host"
-                          value={formData.repositoryHost}
-                          disabled
+                          value={formData.repositoryHost || repositoryHosts[0] || 'images-rc.canfar.net'}
+                          onChange={
+                            handleSelectChange(
+                              'repositoryHost'
+                            ) as React.ComponentProps<typeof Select>['onChange']
+                          }
+                          disabled={isLoading}
                           fullWidth
                           size="sm"
-                        />
+                        >
+                          {repositoryHosts.map((host) => (
+                            <MenuItem key={host} value={host}>
+                              {host}
+                            </MenuItem>
+                          ))}
+                        </Select>
                       </Grid>
                       <Grid size={{ xs: 12, sm: 5 }}>
                         <TextField
@@ -718,7 +863,12 @@ export const SessionLaunchFormImpl = React.forwardRef<
                     </Grid>
 
                     {/* Session name field */}
-                    <Grid container alignItems="center" spacing={2}>
+                    <Grid
+                      container
+                      alignItems="center"
+                      spacing={2}
+                      sx={{ mb: 2 }}
+                    >
                       <Grid size={{ xs: 12, sm: 4 }}>
                         <FormLabel
                           sx={{
@@ -745,6 +895,124 @@ export const SessionLaunchFormImpl = React.forwardRef<
                         />
                       </Grid>
                     </Grid>
+
+                    {/* Resources field - only show for session types that support it */}
+                    {supportsResourceConfig && (
+                      <>
+                        <Grid
+                          container
+                          alignItems="center"
+                          spacing={2}
+                          sx={{ mb: 2 }}
+                        >
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                              }}
+                            >
+                              resources
+                            </FormLabel>
+                          </Grid>
+                          <Grid size={{ xs: 12, sm: 8 }}>
+                            <FormControl component="fieldset">
+                              <RadioGroup
+                                row
+                                value={resourceType}
+                                onChange={handleResourceTypeChange}
+                              >
+                                <FormControlLabel
+                                  value="flexible"
+                                  control={<Radio size="small" />}
+                                  label="Flexible"
+                                  disabled={isLoading}
+                                  sx={{ mr: 1 }}
+                                />
+                                <HelpIcon title="Flexible resources allow dynamic allocation based on availability" />
+                                <FormControlLabel
+                                  value="fixed"
+                                  control={<Radio size="small" />}
+                                  label="Fixed"
+                                  disabled={isLoading}
+                                  sx={{ ml: 2, mr: 1 }}
+                                />
+                                <HelpIcon title="Fixed resources guarantee specific CPU and memory allocation" />
+                              </RadioGroup>
+                            </FormControl>
+                          </Grid>
+                        </Grid>
+
+                        {/* Conditional Memory and CPU fields when Fixed is selected */}
+                        {resourceType === 'fixed' && (
+                          <Grid container alignItems="center" spacing={2}>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              {/* Empty grid for alignment */}
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              <FormLabel
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 400,
+                                  mb: 0.5,
+                                }}
+                              >
+                                Memory (GB)
+                              </FormLabel>
+                              <Select
+                                id="advanced-session-memory"
+                                value={String(formData.memory)}
+                                onChange={
+                                  handleSelectChange('memory') as React.ComponentProps<
+                                    typeof Select
+                                  >['onChange']
+                                }
+                                disabled={isLoading}
+                                fullWidth
+                                size="sm"
+                              >
+                                {(memoryOptions || DEFAULT_MEMORY_OPTIONS).map(
+                                  (mem) => (
+                                    <MenuItem key={mem} value={String(mem)}>
+                                      {mem}
+                                    </MenuItem>
+                                  )
+                                )}
+                              </Select>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>
+                              <FormLabel
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 400,
+                                  mb: 0.5,
+                                }}
+                              >
+                                CPU Cores
+                              </FormLabel>
+                              <Select
+                                id="advanced-session-cores"
+                                value={String(formData.cores)}
+                                onChange={
+                                  handleSelectChange('cores') as React.ComponentProps<
+                                    typeof Select
+                                  >['onChange']
+                                }
+                                disabled={isLoading}
+                                fullWidth
+                                size="sm"
+                              >
+                                {(coreOptions || DEFAULT_CORE_OPTIONS).map((core) => (
+                                  <MenuItem key={core} value={String(core)}>
+                                    {core}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </Grid>
+                          </Grid>
+                        )}
+                      </>
+                    )}
                   </Box>
                 </Box>
 
