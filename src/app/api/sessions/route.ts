@@ -20,6 +20,7 @@ import {
 import { serverApiConfig } from '@/app/api/lib/server-config';
 import { createLogger } from '@/app/api/lib/logger';
 import type { SkahaSessionResponse, SessionLaunchParams } from '@/lib/api/skaha';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 /**
  * GET /api/sessions
@@ -57,7 +58,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
 
   const sessions: SkahaSessionResponse[] = await response.json();
   logger.info(`Retrieved ${sessions.length} session(s)`);
-  logger.logSuccess(200, { count: sessions.length });
+  logger.logSuccess(HTTP_STATUS.OK, { count: sessions.length });
   return successResponse(sessions);
 });
 
@@ -77,10 +78,10 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   // Validate required fields
   if (!body.sessionType || !body.sessionName || !body.containerImage) {
-    logger.logError(400, 'Missing required fields: sessionType, sessionName, containerImage');
+    logger.logError(HTTP_STATUS.BAD_REQUEST, 'Missing required fields: sessionType, sessionName, containerImage');
     return errorResponse(
       'Missing required fields: sessionType, sessionName, containerImage',
-      400
+      HTTP_STATUS.BAD_REQUEST
     );
   }
 
@@ -147,7 +148,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   // SKAHA returns the session ID in the response body as text
   const sessionId = await response.text();
   logger.info(`Successfully launched session: ${body.sessionName}, ID: ${sessionId}`);
-  logger.logSuccess(201, { sessionId, sessionName: body.sessionName });
+  logger.logSuccess(HTTP_STATUS.CREATED, { sessionId, sessionName: body.sessionName });
 
   // Return the session ID and basic info
   return successResponse({
@@ -155,5 +156,5 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     name: body.sessionName,
     type: body.sessionType,
     image: body.containerImage
-  }, 201);
+  }, HTTP_STATUS.CREATED);
 });

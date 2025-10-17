@@ -18,6 +18,7 @@ import {
   validateMethod,
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export interface StorageNode {
   name: string;
@@ -39,7 +40,7 @@ export const GET = withErrorHandling(async (
   const path = searchParams.get('path') || '';
 
   if (!username) {
-    return errorResponse('Username is required', 400);
+    return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   const authHeaders = forwardAuthHeader(request);
@@ -84,11 +85,11 @@ export const POST = withErrorHandling(async (
   const path = searchParams.get('path') || '';
 
   if (!username) {
-    return errorResponse('Username is required', 400);
+    return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   if (!path) {
-    return errorResponse('Path is required for file upload', 400);
+    return errorResponse('Path is required for file upload', HTTP_STATUS.BAD_REQUEST);
   }
 
   const formData = await request.formData();
@@ -125,11 +126,11 @@ export const DELETE = withErrorHandling(async (
   const path = searchParams.get('path') || '';
 
   if (!username) {
-    return errorResponse('Username is required', 400);
+    return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   if (!path) {
-    return errorResponse('Path is required for deletion', 400);
+    return errorResponse('Path is required for deletion', HTTP_STATUS.BAD_REQUEST);
   }
 
   const authHeaders = forwardAuthHeader(request);
@@ -164,11 +165,11 @@ export const PUT = withErrorHandling(async (
   const path = searchParams.get('path') || '';
 
   if (!username) {
-    return errorResponse('Username is required', 400);
+    return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   if (!path) {
-    return errorResponse('Path is required for directory creation', 400);
+    return errorResponse('Path is required for directory creation', HTTP_STATUS.BAD_REQUEST);
   }
 
   const authHeaders = forwardAuthHeader(request);

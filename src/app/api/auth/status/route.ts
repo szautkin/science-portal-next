@@ -17,6 +17,7 @@ import {
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
 import { createLogger } from '@/app/api/lib/logger';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export interface User {
   username: string;
@@ -46,7 +47,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const logger = createLogger('/api/auth/status', 'GET');
 
   if (!validateMethod(request, ['GET'])) {
-    logger.logError(405, 'Method not allowed');
+    logger.logError(HTTP_STATUS.METHOD_NOT_ALLOWED, 'Method not allowed');
     return methodNotAllowed(['GET']);
   }
 
@@ -73,10 +74,10 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
 
   // If not authenticated, return unauthenticated status instead of error
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === HTTP_STATUS.UNAUTHORIZED || response.status === HTTP_STATUS.FORBIDDEN) {
       logger.info('User not authenticated', { status: response.status });
       const result: AuthStatus = { authenticated: false };
-      logger.logSuccess(200, result);
+      logger.logSuccess(HTTP_STATUS.OK, result);
       return successResponse<AuthStatus>(result);
     }
 
@@ -154,6 +155,6 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     user,
   };
 
-  logger.logSuccess(200, result);
+  logger.logSuccess(HTTP_STATUS.OK, result);
   return successResponse<AuthStatus>(result);
 });

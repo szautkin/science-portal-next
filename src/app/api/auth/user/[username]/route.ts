@@ -16,6 +16,7 @@ import {
   methodNotAllowed,
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export interface User {
   username: string;
@@ -39,7 +40,7 @@ export const GET = withErrorHandling(
     const { username } = await context.params;
 
     if (!username) {
-      return errorResponse('Username parameter is required', 400);
+      return errorResponse('Username parameter is required', HTTP_STATUS.BAD_REQUEST);
     }
 
     const cookies = forwardCookies(request);
@@ -65,11 +66,11 @@ export const GET = withErrorHandling(
         errorMessage = errorData.message || errorMessage;
       } catch {
         // If error response is not JSON, use default message
-        if (statusCode === 404) {
+        if (statusCode === HTTP_STATUS.NOT_FOUND) {
           errorMessage = `User '${username}' not found`;
-        } else if (statusCode === 401) {
+        } else if (statusCode === HTTP_STATUS.UNAUTHORIZED) {
           errorMessage = 'Authentication required';
-        } else if (statusCode === 403) {
+        } else if (statusCode === HTTP_STATUS.FORBIDDEN) {
           errorMessage = 'Access forbidden';
         }
       }

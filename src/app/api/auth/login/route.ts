@@ -18,6 +18,7 @@ import {
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
 import { createLogger } from '@/app/api/lib/logger';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export interface LoginCredentials {
   username: string;
@@ -52,7 +53,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   const logger = createLogger('/api/auth/login', 'POST');
 
   if (!validateMethod(request, ['POST'])) {
-    logger.logError(405, 'Method not allowed');
+    logger.logError(HTTP_STATUS.METHOD_NOT_ALLOWED, 'Method not allowed');
     return methodNotAllowed(['POST']);
   }
 
@@ -63,14 +64,14 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     body = await request.json();
     logger.logRequest(request, body);
   } catch (error) {
-    logger.logError(400, 'Invalid JSON in request body', error);
-    return errorResponse('Invalid JSON in request body', 400);
+    logger.logError(HTTP_STATUS.BAD_REQUEST, 'Invalid JSON in request body', error);
+    return errorResponse('Invalid JSON in request body', HTTP_STATUS.BAD_REQUEST);
   }
 
   // Validate required fields
   if (!body.username || !body.password) {
-    logger.logError(400, 'Username and password are required');
-    return errorResponse('Username and password are required', 400);
+    logger.logError(HTTP_STATUS.BAD_REQUEST, 'Username and password are required');
+    return errorResponse('Username and password are required', HTTP_STATUS.BAD_REQUEST);
   }
 
   // CADC login API expects form-urlencoded data, not JSON
@@ -120,9 +121,9 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     } catch {
       logger.logExternalResponse(statusCode, response.statusText);
       // If error response is not JSON, use default message
-      if (statusCode === 401) {
+      if (statusCode === HTTP_STATUS.UNAUTHORIZED) {
         errorMessage = 'Invalid username or password';
-      } else if (statusCode === 403) {
+      } else if (statusCode === HTTP_STATUS.FORBIDDEN) {
         errorMessage = 'Access forbidden';
       }
     }
@@ -206,8 +207,8 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   }
 
   if (!token) {
-    logger.logError(500, 'Failed to extract authentication token from response');
-    return errorResponse('Failed to extract authentication token', 500);
+    logger.logError(HTTP_STATUS.INTERNAL_SERVER_ERROR, 'Failed to extract authentication token from response');
+    return errorResponse('Failed to extract authentication token', HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 
   // Ensure we have user data
@@ -224,6 +225,6 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     token: token,
   };
 
-  logger.logSuccess(200, { user: data, tokenLength: token.length });
+  logger.logSuccess(HTTP_STATUS.OK, { user: data, tokenLength: token.length });
   return successResponse(loginResponse);
 });

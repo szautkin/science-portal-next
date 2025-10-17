@@ -16,6 +16,7 @@ import {
   fetchExternalApi,
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 import { serverApiConfig } from '@/app/api/lib/server-config';
 import type { Session } from '@/lib/api/skaha';
 
@@ -90,5 +91,6 @@ export const DELETE = withErrorHandling(async (
     );
   }
 
-  return successResponse({ success: true }, 204);
+  // DELETE operations return 204 No Content (no response body)
+  return successResponse(null, HTTP_STATUS.NO_CONTENT);
 });

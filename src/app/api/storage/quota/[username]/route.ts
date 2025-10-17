@@ -13,6 +13,7 @@ import {
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export interface UserStorageQuota {
   name: string;
@@ -29,7 +30,7 @@ export const GET = withErrorHandling(async (
   const username = params.username;
 
   if (!username) {
-    return errorResponse('Username is required', 400);
+    return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   const authHeaders = forwardAuthHeader(request);

@@ -16,13 +16,14 @@ import {
   methodNotAllowed,
 } from '@/app/api/lib/api-utils';
 import { createLogger } from '@/app/api/lib/logger';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export const POST = withErrorHandling(async (request: NextRequest) => {
   const logger = createLogger('/api/auth/logout', 'POST');
   logger.logRequest(request);
 
   if (!validateMethod(request, ['POST'])) {
-    logger.logError(405, 'Method not allowed');
+    logger.logError(HTTP_STATUS.METHOD_NOT_ALLOWED, 'Method not allowed');
     return methodNotAllowed(['POST']);
   }
 
@@ -49,6 +50,6 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     logger.info(`Cleared cookie: ${cookieName}`);
   });
 
-  logger.logSuccess(200, { success: true, message: 'Logged out successfully' });
+  logger.logSuccess(HTTP_STATUS.OK, { success: true, message: 'Logged out successfully' });
   return response;
 });

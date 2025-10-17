@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { HTTP_STATUS, HTTP_STATUS_NAMES, API_TIMEOUTS } from './http-constants';
 
 /**
  * Standard API error response
@@ -22,7 +23,7 @@ export interface ApiError {
  */
 export function errorResponse(
   message: string,
-  status: number = 500,
+  status: number = HTTP_STATUS.INTERNAL_SERVER_ERROR,
   details?: unknown
 ): NextResponse<ApiError> {
   return NextResponse.json(
@@ -41,8 +42,12 @@ export function errorResponse(
  */
 export function successResponse<T>(
   data: T,
-  status: number = 200
+  status: number = HTTP_STATUS.OK
 ): NextResponse<T> {
+  // Handle 204 No Content - must not have a body
+  if (status === HTTP_STATUS.NO_CONTENT) {
+    return new NextResponse(null, { status: HTTP_STATUS.NO_CONTENT }) as NextResponse<T>;
+  }
   return NextResponse.json(data, { status });
 }
 
@@ -50,22 +55,7 @@ export function successResponse<T>(
  * Gets error name from status code
  */
 function getErrorName(status: number): string {
-  const errorNames: Record<number, string> = {
-    400: 'Bad Request',
-    401: 'Unauthorized',
-    403: 'Forbidden',
-    404: 'Not Found',
-    405: 'Method Not Allowed',
-    408: 'Request Timeout',
-    409: 'Conflict',
-    422: 'Unprocessable Entity',
-    429: 'Too Many Requests',
-    500: 'Internal Server Error',
-    502: 'Bad Gateway',
-    503: 'Service Unavailable',
-    504: 'Gateway Timeout',
-  };
-  return errorNames[status] || 'Error';
+  return HTTP_STATUS_NAMES[status] || 'Error';
 }
 
 /**
@@ -95,7 +85,7 @@ export async function getRequestBody<T>(request: NextRequest): Promise<T> {
 export async function fetchExternalApi(
   url: string,
   options: RequestInit = {},
-  timeout: number = 30000
+  timeout: number = API_TIMEOUTS.DEFAULT
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -265,7 +255,7 @@ export function copyCookies(
 export function methodNotAllowed(allowedMethods: string[]): NextResponse {
   return errorResponse(
     `Method not allowed. Allowed methods: ${allowedMethods.join(', ')}`,
-    405
+    HTTP_STATUS.METHOD_NOT_ALLOWED
   );
 }
 
@@ -284,15 +274,15 @@ export function withErrorHandling(
       if (error instanceof Error) {
         // Handle specific error types
         if (error.message.includes('timeout')) {
-          return errorResponse('Request timeout', 504, error.message);
+          return errorResponse('Request timeout', HTTP_STATUS.GATEWAY_TIMEOUT, error.message);
         }
         if (error.message.includes('Invalid JSON')) {
-          return errorResponse('Invalid request body', 400, error.message);
+          return errorResponse('Invalid request body', HTTP_STATUS.BAD_REQUEST, error.message);
         }
-        return errorResponse(error.message, 500);
+        return errorResponse(error.message, HTTP_STATUS.INTERNAL_SERVER_ERROR);
       }
 
-      return errorResponse('An unexpected error occurred', 500);
+      return errorResponse('An unexpected error occurred', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
   };
 }

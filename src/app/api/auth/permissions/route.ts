@@ -16,6 +16,7 @@ import {
   methodNotAllowed,
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
+import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 export interface PermissionCheck {
   granted: boolean;
@@ -36,22 +37,22 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
 
   // Validate required query parameters
   if (!username) {
-    return errorResponse('Username query parameter is required', 400);
+    return errorResponse('Username query parameter is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   if (!resource) {
-    return errorResponse('Resource query parameter is required', 400);
+    return errorResponse('Resource query parameter is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   if (!permission) {
-    return errorResponse('Permission query parameter is required', 400);
+    return errorResponse('Permission query parameter is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   // Validate permission value
   if (!['read', 'write', 'execute'].includes(permission)) {
     return errorResponse(
       'Permission must be one of: read, write, execute',
-      400
+      HTTP_STATUS.BAD_REQUEST
     );
   }
 
@@ -74,7 +75,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     const statusCode = response.status;
 
     // For permission checks, a 403 or 404 might mean permission denied
-    if (statusCode === 403 || statusCode === 404) {
+    if (statusCode === HTTP_STATUS.FORBIDDEN || statusCode === HTTP_STATUS.NOT_FOUND) {
       return successResponse<PermissionCheck>({
         granted: false,
         username,
@@ -91,7 +92,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
       errorMessage = errorData.message || errorMessage;
     } catch {
       // If error response is not JSON, use default message
-      if (statusCode === 401) {
+      if (statusCode === HTTP_STATUS.UNAUTHORIZED) {
         errorMessage = 'Authentication required';
       }
     }

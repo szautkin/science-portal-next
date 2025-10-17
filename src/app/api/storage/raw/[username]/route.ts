@@ -12,6 +12,7 @@ import {
   fetchExternalApi,
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
+import { HTTP_STATUS, API_TIMEOUTS } from '@/app/api/lib/http-constants';
 
 interface StorageData {
   size: number;
@@ -58,7 +59,7 @@ export const GET = withErrorHandling(async (
   const username = params.username;
 
   if (!username) {
-    return errorResponse('Username is required', 400);
+    return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
   const authHeaders = forwardAuthHeader(request);
@@ -81,7 +82,7 @@ export const GET = withErrorHandling(async (
         'Accept': 'application/xml',
       },
     },
-    30000
+    API_TIMEOUTS.DEFAULT
   );
 
   console.log('[Storage API] Fetch response:', {
@@ -118,7 +119,7 @@ export const GET = withErrorHandling(async (
 
   // Return JSON response
   return NextResponse.json(storageData, {
-    status: 200,
+    status: HTTP_STATUS.OK,
     headers: {
       'Content-Type': 'application/json',
     },

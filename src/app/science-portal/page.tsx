@@ -49,6 +49,8 @@ export default function SciencePortalPage() {
   const { mutate: deleteSession } = useDeleteSession({
     onSuccess: () => {
       console.log('Session deleted successfully');
+      // Explicitly refetch sessions to update the Active Sessions widget
+      refetchSessions();
     },
     onError: (error) => {
       console.error('Failed to delete session:', error);
