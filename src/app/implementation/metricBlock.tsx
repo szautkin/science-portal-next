@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Box } from '@mui/material';
+import { Box, Skeleton } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { MetricBlockProps } from '../types/MetricBlockProps';
 import { BarChartHorizontal } from '../components/BarChartHorizontal/BarChartHorizontal';
@@ -12,7 +12,7 @@ import { BarChartHorizontal } from '../components/BarChartHorizontal/BarChartHor
 // Memoized to prevent re-renders when parent re-renders
 // MetricBlock only needs to re-render when its props change
 export const MetricBlockImpl: React.FC<MetricBlockProps> = React.memo(
-  ({ label, series, max, className }) => {
+  ({ label, series, max, isLoading = false, className }) => {
     const theme = useTheme();
 
     // Memoized calculations to prevent recalculation on every render
@@ -92,21 +92,32 @@ export const MetricBlockImpl: React.FC<MetricBlockProps> = React.memo(
 
     return (
       <Box className={className} sx={{ marginBottom: theme.spacing(2) }}>
-        <BarChartHorizontal
-          title={displayTitle}
-          data={[series]}
-          total={max}
-          height={60}
-          barSize={25}
-          colors={chartColors}
-          legend={{
-            show: true,
-            position: 'top',
-            items: legendItems,
-          }}
-          stackKeys={stackKeys}
-          margin={{ top: 5, right: 10, left: 20, bottom: 5 }}
-        />
+        {isLoading ? (
+          <Skeleton
+            variant="rectangular"
+            width="100%"
+            height={60}
+            sx={{
+              borderRadius: 1,
+            }}
+          />
+        ) : (
+          <BarChartHorizontal
+            title={displayTitle}
+            data={[series]}
+            total={max}
+            height={60}
+            barSize={25}
+            colors={chartColors}
+            legend={{
+              show: true,
+              position: 'top',
+              items: legendItems,
+            }}
+            stackKeys={stackKeys}
+            margin={{ top: 5, right: 10, left: 20, bottom: 5 }}
+          />
+        )}
       </Box>
     );
   }

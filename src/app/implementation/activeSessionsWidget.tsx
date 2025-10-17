@@ -9,6 +9,8 @@ import {
   LinearProgress,
   Stack,
   useMediaQuery,
+  Card,
+  CardContent,
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
@@ -136,16 +138,102 @@ export function ActiveSessionsWidgetImpl({
 
       {/* Content - Session Cards */}
       <Box sx={{ marginBottom: theme.spacing(2) }}>
-        {sessions.length === 0 ? (
-          <Box
+        {isLoading ? (
+          // Show skeleton cards during loading
+          effectiveLayout === 'column' ? (
+            <Stack spacing={2}>
+              {[1, 2, 3].map((index) => (
+                <SessionCard
+                  key={`skeleton-${index}`}
+                  sessionType="notebook"
+                  sessionName=""
+                  status="Running"
+                  containerImage=""
+                  startedTime=""
+                  expiresTime=""
+                  memoryAllocated=""
+                  cpuAllocated=""
+                  loading={true}
+                  sx={{
+                    maxWidth: responsiveCardMaxWidth,
+                    width: isMobile ? '100%' : 'auto',
+                  }}
+                />
+              ))}
+            </Stack>
+          ) : (
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 2,
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                pb: 1,
+              }}
+            >
+              {[1, 2, 3].map((index) => (
+                <SessionCard
+                  key={`skeleton-${index}`}
+                  sessionType="notebook"
+                  sessionName=""
+                  status="Running"
+                  containerImage=""
+                  startedTime=""
+                  expiresTime=""
+                  memoryAllocated=""
+                  cpuAllocated=""
+                  loading={true}
+                  sx={{
+                    minWidth: responsiveMinWidth,
+                    maxWidth: responsiveCardMaxWidth,
+                    flexShrink: 0,
+                  }}
+                />
+              ))}
+            </Box>
+          )
+        ) : sessions.length === 0 ? (
+          // Show empty state with subtle gradient background - same size as SessionCard
+          <Card
+            elevation={0}
+            variant="outlined"
             sx={{
-              textAlign: 'center',
-              py: 4,
-              color: 'text.secondary',
+              maxWidth: responsiveCardMaxWidth,
+              width: isMobile ? '100%' : 'auto',
+              border: `1px solid ${theme.palette.divider}`,
+              cursor: 'default',
             }}
           >
-            <Typography variant="body1">{emptyMessage}</Typography>
-          </Box>
+            <CardContent
+              sx={{
+                minHeight: '200px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: theme.palette.mode === 'dark'
+                  ? 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 100%)'
+                  : 'linear-gradient(135deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.05) 100%)',
+                [theme.breakpoints.down('sm')]: {
+                  padding: theme.spacing(2),
+                  '&:last-child': {
+                    paddingBottom: theme.spacing(2),
+                  },
+                },
+              }}
+            >
+              <Typography
+                variant="body1"
+                sx={{
+                  color: theme.palette.mode === 'dark'
+                    ? 'rgba(255,255,255,0.3)'
+                    : 'rgba(0,0,0,0.3)',
+                  fontWeight: 400,
+                }}
+              >
+                {emptyMessage}
+              </Typography>
+            </CardContent>
+          </Card>
         ) : effectiveLayout === 'column' ? (
           <Stack spacing={2}>
             {sessionsToDisplay.map((session, index) => (

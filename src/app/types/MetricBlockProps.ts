@@ -38,6 +38,10 @@ export interface MetricBlockProps {
    */
   max: number;
   /**
+   * Whether the metric is in a loading state
+   */
+  isLoading?: boolean;
+  /**
    * Optional custom class name
    */
   className?: string;

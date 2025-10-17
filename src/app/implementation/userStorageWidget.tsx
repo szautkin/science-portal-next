@@ -167,8 +167,13 @@ export const UserStorageWidgetImpl = React.forwardRef<
       return internalData;
     }, [externalData, testMode, internalData]);
 
-    const currentLoading =
-      externalData !== undefined ? isLoading : internalLoading;
+    // Determine current loading state
+    // If we're in controlled mode (parent manages loading), use external isLoading
+    // Otherwise use internal loading state
+    const currentLoading = isLoading || internalLoading;
+
+    // When loading, don't show data - override currentData
+    const displayData = currentLoading ? null : currentData;
     const currentError =
       externalData !== undefined ? errorMessage : internalError;
 
@@ -198,17 +203,17 @@ export const UserStorageWidgetImpl = React.forwardRef<
     const cardData: StorageCardData[] = useMemo(() => {
       return cardConfigs.map((config) => ({
         label: config.label,
-        value: config.formatter((currentData?.[config.key] as number) ?? 0),
+        value: config.formatter((displayData?.[config.key] as number) ?? 0),
         isWarning:
           config.key === 'usage' &&
-          currentData?.usage !== undefined &&
-          currentData.usage > warningThreshold,
+          displayData?.usage !== undefined &&
+          displayData.usage > warningThreshold,
       }));
-    }, [currentData, cardConfigs, warningThreshold]);
+    }, [displayData, cardConfigs, warningThreshold]);
 
     const lastUpdate = useMemo(() => {
-      return currentData?.date ? dateFormatter(currentData.date) : null;
-    }, [currentData?.date, dateFormatter]);
+      return displayData?.date ? dateFormatter(displayData.date) : null;
+    }, [displayData?.date, dateFormatter]);
 
     // Internal fetch function
     const fetchStorageData = useCallback(async () => {
@@ -298,6 +303,14 @@ export const UserStorageWidgetImpl = React.forwardRef<
         fetchStorageData();
       }
     }, [externalData, testMode, isAuthenticated, name, fetchStorageData]);
+
+    // Clear internal data when user logs out
+    useEffect(() => {
+      if (!isAuthenticated) {
+        setInternalData(null);
+        setInternalError(undefined);
+      }
+    }, [isAuthenticated]);
 
     return (
       <Paper
@@ -419,7 +432,7 @@ export const UserStorageWidgetImpl = React.forwardRef<
         )}
 
         {/* Storage Cards or Empty State */}
-        {!currentData && !currentLoading ? (
+        {!displayData && !currentLoading ? (
           <Box
             sx={{
               textAlign: 'center',

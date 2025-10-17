@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AppBar } from '@/app/components/AppBar/AppBar';
 import { AppBarProps } from '@/app/types/AppBarProps';
 import { LoginModal } from '@/app/components/LoginModal/LoginModal';
@@ -47,6 +47,19 @@ export function AppBarWithAuth({
   const { mutate: login, isPending: isLoggingIn, error: loginError } = useLogin();
   const { mutate: logout } = useLogout();
 
+  // Check for showLogin URL parameter on mount (after logout redirect)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('showLogin') === 'true') {
+      // Open login modal
+      setLoginModalOpen(true);
+      // Clean up URL by removing the showLogin parameter
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('showLogin');
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+  }, []);
+
   const handleOpenLogin = useCallback(() => {
     setLoginModalOpen(true);
   }, []);
@@ -73,7 +86,15 @@ export function AppBarWithAuth({
   );
 
   const handleLogout = useCallback(() => {
-    logout();
+    logout(undefined, {
+      onSuccess: () => {
+        // Clear URL query parameters and add showLogin flag
+        const currentUrl = new URL(window.location.href);
+        currentUrl.search = '?showLogin=true';
+        // Reload the page to reset all state and show login modal
+        window.location.href = currentUrl.toString();
+      },
+    });
   }, [logout]);
 
   const handleUpdateProfile = useCallback(() => {

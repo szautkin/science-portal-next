@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
 import { UserStorageWidget } from '@/app/components/UserStorageWidget/UserStorageWidget';
@@ -17,12 +17,47 @@ import { useAuthStatus } from '@/lib/hooks/useAuth';
 import { useSessions, useDeleteSession, useRenewSession } from '@/lib/hooks/useSessions';
 import { usePlatformLoad } from '@/lib/hooks/usePlatformLoad';
 import { useContainerImages, useImageRepositories } from '@/lib/hooks/useImages';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Session } from '@/lib/api/skaha';
 
 export default function SciencePortalPage() {
-  // Get authentication status
-  const { data: authStatus } = useAuthStatus();
+  // Get authentication status and query client for cache management
+  const { data: authStatus, isLoading: isAuthLoading } = useAuthStatus();
   const isAuthenticated = authStatus?.authenticated ?? false;
+  const queryClient = useQueryClient();
+
+  // Track previous auth state to detect logout
+  const [prevAuthState, setPrevAuthState] = useState(isAuthenticated);
+
+  // Detect logout and trigger page reload to reset everything
+  useEffect(() => {
+    // If user logged out, clear everything and reload the page
+    if (!isAuthenticated && prevAuthState === true) {
+      setPrevAuthState(isAuthenticated);
+
+      // Clear all queries except auth status
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          return !query.queryKey.includes('auth');
+        },
+      });
+
+      // Remove all non-auth queries from cache
+      queryClient.removeQueries({
+        predicate: (query) => {
+          return !query.queryKey.includes('auth');
+        },
+      });
+
+      // Clear nuqs state from URL (remove all query parameters)
+      // and reload the page to reset all state
+      const currentUrl = new URL(window.location.href);
+      currentUrl.search = ''; // Clear all query parameters
+      window.location.href = currentUrl.toString(); // Full page reload
+    } else if (isAuthenticated && prevAuthState === false) {
+      setPrevAuthState(isAuthenticated);
+    }
+  }, [isAuthenticated, prevAuthState, queryClient]);
 
   // Fetch active sessions using the hook
   const {
@@ -32,9 +67,6 @@ export default function SciencePortalPage() {
     refetch: refetchSessions
   } = useSessions(isAuthenticated);
 
-  // Show loading state during initial load or manual refresh
-  const isLoadingSessions = isLoading || isFetching;
-
   // Fetch platform load using the hook
   const {
     data: platformLoadData,
@@ -42,9 +74,6 @@ export default function SciencePortalPage() {
     isFetching: isPlatformFetching,
     refetch: refetchPlatformLoad
   } = usePlatformLoad(isAuthenticated);
-
-  // Show loading state during initial load or manual refresh
-  const isLoadingPlatform = isPlatformLoading || isPlatformFetching;
 
   // Fetch container images and repositories for the Launch Form
   const {
@@ -61,8 +90,13 @@ export default function SciencePortalPage() {
     refetch: refetchRepositories
   } = useImageRepositories(isAuthenticated);
 
-  // Combined loading state for Launch Form
-  const isLoadingLaunchForm = isLoadingImages || isFetchingImages || isLoadingRepositories || isFetchingRepositories;
+  // SIMPLE LOADING LOGIC - ALL IN ONE PLACE:
+  // NOT authenticated → ALWAYS show loading
+  // IS authenticated → show loading ONLY while fetching (isLoading = true)
+  const isLoadingSessions = !isAuthenticated || isLoading;
+  const isLoadingPlatform = !isAuthenticated || isPlatformLoading;
+  const isLoadingLaunchForm = !isAuthenticated || isLoadingImages || isLoadingRepositories;
+  const isLoadingUserStorage = !isAuthenticated;
 
   // Mutation hooks for session actions
   const { mutate: deleteSession } = useDeleteSession({
@@ -237,7 +271,7 @@ export default function SciencePortalPage() {
               <UserStorageWidget
                 isAuthenticated={isAuthenticated}
                 name={authStatus?.user?.username || ''}
-                testMode={!isAuthenticated}
+                isLoading={isLoadingUserStorage}
               />
             </Box>
           </Box>

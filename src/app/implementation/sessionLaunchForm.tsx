@@ -19,6 +19,8 @@ import {
   FormControlLabel,
   Radio,
   Typography,
+  Skeleton,
+  Stack,
 } from '@mui/material';
 import { HelpOutline as HelpOutlineIcon } from '@mui/icons-material';
 import { useQueryStates, parseAsString, parseAsInteger } from 'nuqs';
@@ -375,8 +377,78 @@ export const SessionLaunchFormImpl = React.forwardRef<
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
-            <TabPanel value={tabValue} index={0}>
+          {isLoading ? (
+            // Skeleton loading state
+            <Box sx={{ pt: theme.spacing(3) }}>
+              <Stack spacing={2.5}>
+                {/* Type field skeleton */}
+                <Grid container alignItems="center" spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Skeleton variant="text" width="60%" height={20} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 1 }} />
+                  </Grid>
+                </Grid>
+
+                {/* Project field skeleton */}
+                <Grid container alignItems="center" spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Skeleton variant="text" width="60%" height={20} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 1 }} />
+                  </Grid>
+                </Grid>
+
+                {/* Container Image field skeleton */}
+                <Grid container alignItems="center" spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Skeleton variant="text" width="80%" height={20} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 1 }} />
+                  </Grid>
+                </Grid>
+
+                {/* Session Name field skeleton */}
+                <Grid container alignItems="center" spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Skeleton variant="text" width="70%" height={20} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 1 }} />
+                  </Grid>
+                </Grid>
+
+                {/* Resources field skeleton */}
+                <Grid container alignItems="center" spacing={2}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <Skeleton variant="text" width="60%" height={20} />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Skeleton variant="rectangular" width={120} height={32} sx={{ borderRadius: 1 }} />
+                      <Skeleton variant="rectangular" width={120} height={32} sx={{ borderRadius: 1 }} />
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Buttons skeleton */}
+                <Grid container spacing={2} sx={{ mt: theme.spacing(3) }}>
+                  <Grid size={{ xs: 12, sm: 4 }} />
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <Box sx={{ display: 'flex', gap: theme.spacing(2) }}>
+                      <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                      <Skeleton variant="rectangular" width={80} height={32} sx={{ borderRadius: 1 }} />
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Stack>
+            </Box>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <TabPanel value={tabValue} index={0}>
               <Box
                 sx={{
                   display: 'flex',
@@ -1046,6 +1118,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
               </Box>
             </TabPanel>
           </form>
+          )}
         </CardContent>
       </Card>
     );

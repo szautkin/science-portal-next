@@ -98,16 +98,19 @@ export const PlatformLoadImpl: React.FC<PlatformLoadProps> = ({
               label="CPU"
               series={data.cpu}
               max={data.maxValues.cpu}
+              isLoading={isLoading}
             />
             <MetricBlock
               label="RAM"
               series={data.ram}
               max={data.maxValues.ram}
+              isLoading={isLoading}
             />
             <MetricBlock
               label="Running Instances"
               series={data.instances}
               max={data.maxValues.instances}
+              isLoading={isLoading}
             />
           </Stack>
         ) : (
@@ -116,16 +119,19 @@ export const PlatformLoadImpl: React.FC<PlatformLoadProps> = ({
               label="CPU"
               series={data.cpu}
               max={data.maxValues.cpu}
+              isLoading={isLoading}
             />
             <MetricBlock
               label="RAM"
               series={data.ram}
               max={data.maxValues.ram}
+              isLoading={isLoading}
             />
             <MetricBlock
               label="Running Instances"
               series={data.instances}
               max={data.maxValues.instances}
+              isLoading={isLoading}
             />
           </Stack>
         )}
