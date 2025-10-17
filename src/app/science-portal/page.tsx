@@ -16,6 +16,7 @@ import type { PlatformLoadData } from '@/app/types/PlatformLoadProps';
 import { useAuthStatus } from '@/lib/hooks/useAuth';
 import { useSessions, useDeleteSession, useRenewSession } from '@/lib/hooks/useSessions';
 import { usePlatformLoad } from '@/lib/hooks/usePlatformLoad';
+import { useContainerImages, useImageRepositories } from '@/lib/hooks/useImages';
 import type { Session } from '@/lib/api/skaha';
 
 export default function SciencePortalPage() {
@@ -44,6 +45,24 @@ export default function SciencePortalPage() {
 
   // Show loading state during initial load or manual refresh
   const isLoadingPlatform = isPlatformLoading || isPlatformFetching;
+
+  // Fetch container images and repositories for the Launch Form
+  const {
+    data: imagesByType = {},
+    isLoading: isLoadingImages,
+    isFetching: isFetchingImages,
+    refetch: refetchImages
+  } = useContainerImages(isAuthenticated);
+
+  const {
+    data: imageRepositories = [],
+    isLoading: isLoadingRepositories,
+    isFetching: isFetchingRepositories,
+    refetch: refetchRepositories
+  } = useImageRepositories(isAuthenticated);
+
+  // Combined loading state for Launch Form
+  const isLoadingLaunchForm = isLoadingImages || isFetchingImages || isLoadingRepositories || isFetchingRepositories;
 
   // Mutation hooks for session actions
   const { mutate: deleteSession } = useDeleteSession({
@@ -109,6 +128,13 @@ export default function SciencePortalPage() {
     // Refetch platform load from API
     refetchPlatformLoad();
   }, [refetchPlatformLoad]);
+
+  // Handle refresh for Launch Form (images and repositories)
+  const handleLaunchFormRefresh = useCallback(() => {
+    // Refetch both images and repositories
+    refetchImages();
+    refetchRepositories();
+  }, [refetchImages, refetchRepositories]);
 
   // Provide placeholder data for Platform Load when data is not yet loaded
   const platformLoadDataOrPlaceholder: PlatformLoadData = useMemo(() => {
@@ -233,7 +259,14 @@ export default function SciencePortalPage() {
                 minWidth: 0, // Prevent flex item from overflowing
               }}
             >
-              <LaunchFormWidget helpUrl="https://www.opencadc.org/science-containers/" />
+              <LaunchFormWidget
+              helpUrl="https://www.opencadc.org/science-containers/"
+              imagesByType={imagesByType}
+              repositoryHosts={imageRepositories.map(repo => repo.host)}
+              isLoading={isLoadingLaunchForm}
+              onRefresh={handleLaunchFormRefresh}
+              activeSessions={sessions}
+            />
             </Box>
 
             {/* PlatformLoad - 40% width on large screens */}

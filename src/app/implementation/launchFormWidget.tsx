@@ -19,9 +19,6 @@ import { SessionLaunchForm } from '@/app/components/SessionLaunchForm/SessionLau
 import { SessionRequestModal } from '@/app/components/SessionRequestModal/SessionRequestModal';
 import { SessionFormData } from '@/app/types/SessionLaunchFormProps';
 import { SessionRequestStatus } from '@/app/types/SessionRequestModalProps';
-import { useContainerImages, useImageRepositories } from '@/lib/hooks/useImages';
-import { useAuthStatus } from '@/lib/hooks/useAuth';
-import { useSessions } from '@/lib/hooks/useSessions';
 
 export function LaunchFormWidgetImpl({
   isLoading = false,
@@ -30,20 +27,12 @@ export function LaunchFormWidgetImpl({
   showProgressIndicator = false,
   progressPercentage = 0,
   helpUrl,
+  imagesByType = {},
+  repositoryHosts = [],
+  activeSessions = [],
   ...sessionLaunchFormProps
 }: LaunchFormWidgetProps) {
   const theme = useTheme();
-
-  // Get auth status
-  const { data: authStatus } = useAuthStatus();
-  const isAuthenticated = authStatus?.authenticated ?? false;
-
-  // Fetch images and repositories from API
-  const { data: imagesByType = {}, isLoading: isLoadingImages, refetch: refetchImages } = useContainerImages(isAuthenticated);
-  const { data: imageRepositories = [], isLoading: isLoadingRepositories } = useImageRepositories(isAuthenticated);
-
-  // Fetch active sessions to calculate the next session name
-  const { data: activeSessions = [] } = useSessions(isAuthenticated);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [requestStatus, setRequestStatus] =
@@ -52,11 +41,6 @@ export function LaunchFormWidgetImpl({
   const [sessionData, setSessionData] = useState<SessionFormData | null>(null);
   const [selectedSessionType, setSelectedSessionType] = useState<string>('notebook');
   const [launchedSession, setLaunchedSession] = useState<any>(null);
-
-  // Extract repository hosts for dropdown
-  const repositoryHosts = useMemo(() => {
-    return imageRepositories.map(repo => repo.host);
-  }, [imageRepositories]);
 
   const handleLaunch = useCallback(
     async (formData: SessionFormData) => {
@@ -279,7 +263,7 @@ export function LaunchFormWidgetImpl({
           {...sessionLaunchFormProps}
           imagesByType={imagesByType}
           onLaunch={handleLaunch}
-          isLoading={isLoading || isLoadingImages || isLoadingRepositories}
+          isLoading={isLoading}
           onSessionTypeChange={setSelectedSessionType}
           repositoryHosts={repositoryHosts}
           activeSessions={activeSessions}
