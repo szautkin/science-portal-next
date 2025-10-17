@@ -132,12 +132,12 @@ export const SessionLaunchFormImpl = React.forwardRef<
       memory: urlParams.memory ?? defaultValues.memory ?? DEFAULT_RAM_NUMBER,
       cores: urlParams.cores ?? defaultValues.cores ?? DEFAULT_CORES_NUMBER,
       // Advanced tab fields
-      repositoryHost: repositoryHosts[0] || 'images-rc.canfar.net',
+      repositoryHost: repositoryHosts.find(host => host && typeof host === 'string') || 'images-rc.canfar.net',
       image: '',
       repositoryAuthUsername: '',
       repositoryAuthSecret: '',
     });
-
+    console.log('repositoryHosts', repositoryHosts)
     // Get available projects for the selected session type
     const availableProjects = useMemo(() => {
       const imagesForType = imagesByType[formData.type];
@@ -154,7 +154,8 @@ export const SessionLaunchFormImpl = React.forwardRef<
       if (!imagesForProject) return [];
 
       // Filter images to only show those from the primary repository host
-      const primaryHost = repositoryHosts[0];
+      const validHosts = repositoryHosts.filter(host => host && typeof host === 'string');
+      const primaryHost = validHosts[0];
       if (!primaryHost) return imagesForProject;
 
       return imagesForProject.filter(img => img.registry === primaryHost);
@@ -212,6 +213,24 @@ export const SessionLaunchFormImpl = React.forwardRef<
         setUrlParams({ image: firstImage.id });
       }
     }, [imagesByType, formData.type, formData.project, formData.containerImage, setUrlParams]);
+
+    // Update repositoryHost when repositoryHosts changes (API loads)
+    useEffect(() => {
+      const validHosts = repositoryHosts.filter(host => host && typeof host === 'string');
+      if (validHosts.length > 0) {
+        // Update if no host is set OR if current host is the fallback value
+        // This ensures we use the API value instead of the fallback
+        const isFallbackValue = formData.repositoryHost === 'images-rc.canfar.net';
+        const needsUpdate = !formData.repositoryHost || isFallbackValue;
+
+        if (needsUpdate && validHosts[0] !== formData.repositoryHost) {
+          setFormData((prev) => ({
+            ...prev,
+            repositoryHost: validHosts[0],
+          }));
+        }
+      }
+    }, [repositoryHosts, formData.repositoryHost]);
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
       setTabValue(newValue);
@@ -310,7 +329,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
         memory: defaultValues.memory || DEFAULT_RAM_NUMBER,
         cores: defaultValues.cores || DEFAULT_CORES_NUMBER,
         // Advanced tab fields
-        repositoryHost: repositoryHosts[0] || 'images-rc.canfar.net',
+        repositoryHost: repositoryHosts.find(host => host && typeof host === 'string') || 'images-rc.canfar.net',
         image: '',
         repositoryAuthUsername: '',
         repositoryAuthSecret: '',
@@ -824,7 +843,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
                       <Grid size={{ xs: 12, sm: 3 }}>
                         <Select
                           id="repository-host"
-                          value={formData.repositoryHost || repositoryHosts[0] || 'images-rc.canfar.net'}
+                          value={formData.repositoryHost || repositoryHosts.find(h => h && typeof h === 'string') || 'images-rc.canfar.net'}
                           onChange={
                             handleSelectChange(
                               'repositoryHost'
@@ -834,11 +853,19 @@ export const SessionLaunchFormImpl = React.forwardRef<
                           fullWidth
                           size="sm"
                         >
-                          {repositoryHosts.map((host) => (
-                            <MenuItem key={host} value={host}>
-                              {host}
+                          {repositoryHosts.filter(host => host && typeof host === 'string').length > 0 ? (
+                            repositoryHosts
+                              .filter(host => host && typeof host === 'string')
+                              .map((host) => (
+                                <MenuItem key={host} value={host}>
+                                  {host}
+                                </MenuItem>
+                              ))
+                          ) : (
+                            <MenuItem value="images-rc.canfar.net">
+                              images-rc.canfar.net
                             </MenuItem>
-                          ))}
+                          )}
                         </Select>
                       </Grid>
                       <Grid size={{ xs: 12, sm: 5 }}>

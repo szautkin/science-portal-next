@@ -127,6 +127,9 @@ export interface SessionLaunchParams {
   ram: number;
   env?: Record<string, string>;
   cmd?: string;
+  // Registry authentication for private/unknown images (Advanced tab)
+  registryUsername?: string;
+  registrySecret?: string;
 }
 
 /**

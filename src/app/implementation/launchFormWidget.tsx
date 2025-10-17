@@ -66,6 +66,11 @@ export function LaunchFormWidgetImpl({
           containerImage: imageToUse,
           cores: formData.cores,
           ram: formData.memory,
+          // Include registry auth if provided (for Advanced tab with custom images)
+          ...(formData.repositoryAuthUsername && formData.repositoryAuthSecret && {
+            registryUsername: formData.repositoryAuthUsername,
+            registrySecret: formData.repositoryAuthSecret,
+          }),
         };
 
         // Launch the session and get the session ID

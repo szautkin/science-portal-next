@@ -296,7 +296,7 @@ export default function SciencePortalPage() {
               <LaunchFormWidget
               helpUrl="https://www.opencadc.org/science-containers/"
               imagesByType={imagesByType}
-              repositoryHosts={imageRepositories.map(repo => repo.host)}
+              repositoryHosts={imageRepositories.map(repo => repo.host).filter((host): host is string => Boolean(host))}
               isLoading={isLoadingLaunchForm}
               onRefresh={handleLaunchFormRefresh}
               activeSessions={sessions}

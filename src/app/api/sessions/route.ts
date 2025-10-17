@@ -119,17 +119,27 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   const authHeaders = forwardAuthHeader(request);
 
+  // Build headers for the request
+  const headers: HeadersInit = {
+    ...authHeaders,
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Accept': 'application/json',
+  };
+
+  // Add registry authentication header if credentials are provided (for Advanced tab)
+  if (body.registryUsername && body.registrySecret) {
+    const registryAuth = Buffer.from(`${body.registryUsername}:${body.registrySecret}`).toString('base64');
+    (headers as Record<string, string>)['x-skaha-registry-auth'] = registryAuth;
+    logger.info(`Including registry auth for user: ${body.registryUsername}`);
+  }
+
   logger.info(`Launching session: ${body.sessionName} with image: ${body.containerImage}`);
 
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v1/session`,
     {
       method: 'POST',
-      headers: {
-        ...authHeaders,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-      },
+      headers,
       body: formData.toString(),
     },
     serverApiConfig.skaha.timeout
@@ -138,8 +148,26 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   if (!response.ok) {
     const errorText = await response.text();
     logger.logError(response.status, `Failed to launch session: ${response.statusText}`, errorText);
+
+    // Parse and format error message for better user experience
+    let userMessage = 'Failed to launch session';
+    if (errorText) {
+      // Remove extra newlines and whitespace
+      const cleanedError = errorText.trim().replace(/\n+/g, ' ');
+
+      // Check for specific error patterns
+      if (cleanedError.includes('No authentication provided for unknown or private image')) {
+        userMessage = 'This image requires authentication. Please provide registry username and password in the Advanced tab.';
+      } else if (cleanedError.includes('authentication') || cleanedError.includes('unauthorized')) {
+        userMessage = 'Authentication failed. Please check your registry credentials.';
+      } else {
+        // Use the error text if it's not too long
+        userMessage = cleanedError.length > 200 ? 'Failed to launch session. Please check your configuration.' : cleanedError;
+      }
+    }
+
     return errorResponse(
-      'Failed to launch session',
+      userMessage,
       response.status,
       errorText
     );
