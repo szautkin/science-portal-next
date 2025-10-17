@@ -33,6 +33,15 @@ import {
   SessionType,
 } from '@/app/types/SessionLaunchFormProps';
 import { getProjectNames } from '@/lib/utils/image-parser';
+import {
+  DEFAULT_CORES_NUMBER,
+  DEFAULT_RAM_NUMBER,
+  supportsCustomResources,
+  DESKTOP_TYPE,
+  FIREFLY_TYPE,
+  NOTEBOOK_TYPE,
+  SKAHA_PROJECT,
+} from '@/lib/config/constants';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -77,12 +86,12 @@ export const SessionLaunchFormImpl = React.forwardRef<
       memoryOptions,
       coreOptions,
       defaultValues = {
-        type: 'notebook',
-        project: '',
-        containerImage: '',
+        type: NOTEBOOK_TYPE,
+        project: SKAHA_PROJECT,
+        containerImage: '', // Will be auto-selected from imagesByType when data loads
         sessionName: 'notebook1',
-        memory: 8,
-        cores: 2,
+        memory: DEFAULT_RAM_NUMBER,
+        cores: DEFAULT_CORES_NUMBER,
       },
       isLoading = false,
       errorMessage,
@@ -96,9 +105,9 @@ export const SessionLaunchFormImpl = React.forwardRef<
     const [urlParams, setUrlParams] = useQueryStates(
       {
         tab: parseAsInteger.withDefault(0), // 0 = Standard, 1 = Advanced
-        type: parseAsString.withDefault(defaultValues.type || 'notebook'),
-        project: parseAsString.withDefault(defaultValues.project || ''),
-        image: parseAsString.withDefault(defaultValues.containerImage || ''),
+        type: parseAsString.withDefault(defaultValues.type || NOTEBOOK_TYPE),
+        project: parseAsString.withDefault(defaultValues.project || SKAHA_PROJECT),
+        image: parseAsString.withDefault(defaultValues.containerImage || ''), // Will be auto-selected
         name: parseAsString.withDefault(defaultValues.sessionName || ''),
         memory: parseAsInteger, // Nullable - only present for Fixed resources
         cores: parseAsInteger, // Nullable - only present for Fixed resources
@@ -120,8 +129,8 @@ export const SessionLaunchFormImpl = React.forwardRef<
       project: urlParams.project,
       containerImage: urlParams.image,
       sessionName: urlParams.name || defaultValues.sessionName || 'notebook1',
-      memory: urlParams.memory ?? defaultValues.memory ?? 8,
-      cores: urlParams.cores ?? defaultValues.cores ?? 2,
+      memory: urlParams.memory ?? defaultValues.memory ?? DEFAULT_RAM_NUMBER,
+      cores: urlParams.cores ?? defaultValues.cores ?? DEFAULT_CORES_NUMBER,
       // Advanced tab fields
       repositoryHost: repositoryHosts[0] || 'images-rc.canfar.net',
       image: '',
@@ -137,17 +146,24 @@ export const SessionLaunchFormImpl = React.forwardRef<
     }, [imagesByType, formData.type]);
 
     // Get available images for the selected type and project
+    // Filter by the primary repository host (first in repositoryHosts array)
     const availableImages = useMemo(() => {
       const imagesForType = imagesByType[formData.type];
       if (!imagesForType || !formData.project) return [];
       const imagesForProject = imagesForType[formData.project];
-      return imagesForProject || [];
-    }, [imagesByType, formData.type, formData.project]);
+      if (!imagesForProject) return [];
+
+      // Filter images to only show those from the primary repository host
+      const primaryHost = repositoryHosts[0];
+      if (!primaryHost) return imagesForProject;
+
+      return imagesForProject.filter(img => img.registry === primaryHost);
+    }, [imagesByType, formData.type, formData.project, repositoryHosts]);
 
     // Check if the selected session type supports resource configuration
     // firefly and desktop don't support custom resource allocation
     const supportsResourceConfig = useMemo(() => {
-      return formData.type !== 'firefly' && formData.type !== 'desktop';
+      return supportsCustomResources(formData.type);
     }, [formData.type]);
 
     // Generate the next available session name based on active sessions
@@ -162,6 +178,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
     }, [activeSessions]);
 
     // Update session name when active sessions change
+    // Auto-generate session name when type changes or on mount
     useEffect(() => {
       const newSessionName = generateSessionName(formData.type);
       setFormData((prev) => ({
@@ -170,6 +187,31 @@ export const SessionLaunchFormImpl = React.forwardRef<
       }));
       setUrlParams({ name: newSessionName });
     }, [activeSessions, generateSessionName, formData.type, setUrlParams]);
+
+    // Auto-select default image when images load or type/project changes
+    useEffect(() => {
+      // Only auto-select if no image is currently selected or if the current image is invalid
+      if (!imagesByType || Object.keys(imagesByType).length === 0) return;
+
+      const imagesForType = imagesByType[formData.type];
+      if (!imagesForType) return;
+
+      const imagesForProject = imagesForType[formData.project];
+      if (!imagesForProject || imagesForProject.length === 0) return;
+
+      // Check if current containerImage is valid for the current type/project
+      const currentImageValid = imagesForProject.some(img => img.id === formData.containerImage);
+
+      // If no image selected or current image is invalid, select the first available image
+      if (!formData.containerImage || !currentImageValid) {
+        const firstImage = imagesForProject[0];
+        setFormData((prev) => ({
+          ...prev,
+          containerImage: firstImage.id,
+        }));
+        setUrlParams({ image: firstImage.id });
+      }
+    }, [imagesByType, formData.type, formData.project, formData.containerImage, setUrlParams]);
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
       setTabValue(newValue);
@@ -207,8 +249,8 @@ export const SessionLaunchFormImpl = React.forwardRef<
 
           // Reset dependent fields when session type changes
           if (field === 'type' && typeof value === 'string') {
-            newData.project = '';
-            newData.containerImage = '';
+            newData.project = SKAHA_PROJECT; // Set to default project
+            newData.containerImage = ''; // Will be auto-selected by useEffect
             // Automatically update session name based on the new type
             newData.sessionName = generateSessionName(value);
           }
@@ -225,11 +267,11 @@ export const SessionLaunchFormImpl = React.forwardRef<
         if (field === 'type') {
           const newType = value as string;
           // If switching to firefly or desktop, clear resource params
-          if (newType === 'firefly' || newType === 'desktop') {
-            setUrlParams({ type: newType, project: '', image: '', cores: null, memory: null });
+          if (newType === FIREFLY_TYPE || newType === DESKTOP_TYPE) {
+            setUrlParams({ type: newType, project: SKAHA_PROJECT, image: '', cores: null, memory: null });
             setResourceType('flexible'); // Reset to flexible
           } else {
-            setUrlParams({ type: newType, project: '', image: '' });
+            setUrlParams({ type: newType, project: SKAHA_PROJECT, image: '' });
           }
         } else if (field === 'project') {
           setUrlParams({ project: value as string, image: '' });
@@ -261,12 +303,12 @@ export const SessionLaunchFormImpl = React.forwardRef<
 
     const handleReset = useCallback(() => {
       setFormData({
-        type: defaultValues.type || 'notebook',
-        project: defaultValues.project || '',
-        containerImage: defaultValues.containerImage || '',
+        type: defaultValues.type || NOTEBOOK_TYPE,
+        project: defaultValues.project || SKAHA_PROJECT,
+        containerImage: '', // Will be auto-selected by useEffect
         sessionName: defaultValues.sessionName || 'notebook1',
-        memory: defaultValues.memory || 8,
-        cores: defaultValues.cores || 2,
+        memory: defaultValues.memory || DEFAULT_RAM_NUMBER,
+        cores: defaultValues.cores || DEFAULT_CORES_NUMBER,
         // Advanced tab fields
         repositoryHost: repositoryHosts[0] || 'images-rc.canfar.net',
         image: '',
@@ -279,9 +321,9 @@ export const SessionLaunchFormImpl = React.forwardRef<
       // Reset URL parameters to defaults
       setUrlParams({
         tab: 0,
-        type: defaultValues.type || 'notebook',
-        project: defaultValues.project || '',
-        image: defaultValues.containerImage || '',
+        type: defaultValues.type || NOTEBOOK_TYPE,
+        project: defaultValues.project || SKAHA_PROJECT,
+        image: '', // Will be auto-selected by useEffect
         name: defaultValues.sessionName || 'notebook1',
         cores: null, // Flexible = no cores/memory in URL
         memory: null,
