@@ -47,7 +47,7 @@ export const POST = withErrorHandling(async (
   logger.logRequest(request);
   logger.info(`Renewing session: ${sessionId}`);
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
 
   // SKAHA API: POST /v1/session/{sessionID} with action=renew as form data
   const response = await fetchExternalApi(

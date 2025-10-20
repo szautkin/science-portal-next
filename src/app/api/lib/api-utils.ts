@@ -127,10 +127,13 @@ export async function fetchExternalApi(
   const startTime = Date.now();
 
   try {
+    // Don't send credentials (cookies) in OIDC mode - only Bearer tokens
+    const isOIDC = process.env.NEXT_USE_CANFAR !== 'true';
+
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
-      credentials: 'include',
+      credentials: isOIDC ? 'omit' : 'include', // omit cookies in OIDC mode
     });
 
     clearTimeout(timeoutId);
@@ -212,14 +215,46 @@ export function forwardCookies(clientRequest: NextRequest): HeadersInit {
 /**
  * Forwards Authorization header from client request to external API
  *
- * Extracts the Bearer token from the Authorization header and returns
- * it in a format suitable for external API calls.
+ * In OIDC mode: Extracts access token from NextAuth session and sends as Bearer token
+ * In CANFAR mode: Forwards the Authorization header from the client
+ *
+ * @param clientRequest - The incoming Next.js request
+ * @returns Headers object with Authorization header if available
  */
-export function forwardAuthHeader(clientRequest: NextRequest): HeadersInit {
+export async function forwardAuthHeader(clientRequest: NextRequest): Promise<HeadersInit> {
+  const isOIDC = process.env.NEXT_USE_CANFAR !== 'true';
+
+  console.log('🔧 forwardAuthHeader called');
+  console.log('   Mode:', isOIDC ? 'OIDC' : 'CANFAR');
+
+  if (isOIDC) {
+    // In OIDC mode, get the JWT from NextAuth session (server-side)
+    const { auth } = await import('@/auth');
+    const session = await auth();
+
+    console.log('   Session:', session ? 'present' : 'missing');
+    console.log('   Access token:', session?.accessToken ? `${session.accessToken.substring(0, 30)}...` : 'missing');
+
+    if (session?.accessToken) {
+      console.log('✅ Using JWT from NextAuth session');
+      return { Authorization: `Bearer ${session.accessToken}` };
+    }
+
+    console.warn('⚠️  No session or access token in OIDC mode');
+    return {};
+  }
+
+  // In CANFAR mode, forward the Authorization header from the client request
   const authHeader = clientRequest.headers.get('authorization');
-  return authHeader
-    ? { Authorization: authHeader }
-    : {};
+  console.log('   Client Authorization header:', authHeader ? `${authHeader.substring(0, 30)}...` : 'missing');
+
+  if (authHeader) {
+    console.log('✅ Forwarding Authorization header from client (CANFAR mode)');
+    return { Authorization: authHeader };
+  }
+
+  console.warn('⚠️  No Authorization header from client (CANFAR mode)');
+  return {};
 }
 
 /**

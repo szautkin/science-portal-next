@@ -62,7 +62,7 @@ export const GET = withErrorHandling(async (
     return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
   // Use SERVICE_STORAGE_API with username appended
   const storageBaseUrl = process.env.SERVICE_STORAGE_API || '';
   const storageUrl = `${storageBaseUrl}${username}`;

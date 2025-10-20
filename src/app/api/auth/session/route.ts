@@ -1,12 +1,13 @@
 /**
- * NextAuth Session API Route
+ * Session API Route
  *
- * This endpoint is called by NextAuth's SessionProvider.
- * We use our custom auth system, so this returns the auth status
- * from our /api/auth/status endpoint.
+ * Mode-aware session endpoint that works with both:
+ * - CANFAR mode: Custom auth with CANFAR whoami
+ * - OIDC mode: Delegates to NextAuth's built-in session handling
  */
 
 import { NextRequest } from 'next/server';
+import { auth } from '@/auth';
 import {
   withErrorHandling,
   successResponse,
@@ -17,13 +18,32 @@ import { serverApiConfig } from '@/app/api/lib/server-config';
 
 /**
  * GET /api/auth/session
- * Returns the current session status for NextAuth compatibility
+ * Returns the current session status in NextAuth format
  */
 export const GET = withErrorHandling(async (request: NextRequest) => {
+  const isOIDC = process.env.NEXT_USE_CANFAR !== 'true';
+
+  if (isOIDC) {
+    // In OIDC mode, use NextAuth session
+    const session = await auth();
+
+    if (!session || !session.user) {
+      return successResponse(null);
+    }
+
+    // Return session with access token for client
+    return successResponse({
+      user: session.user,
+      accessToken: session.accessToken,
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+  }
+
+  // CANFAR mode: Use custom auth with cookies
   try {
     const cookies = forwardCookies(request);
 
-    // Call our custom auth status endpoint
+    // Call CANFAR whoami endpoint
     const response = await fetchExternalApi(
       `${serverApiConfig.login.baseUrl}/whoami`,
       {
@@ -50,7 +70,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
         email: user.email,
         image: null,
       },
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
   } catch (error) {
     // Return null session on error (not authenticated)

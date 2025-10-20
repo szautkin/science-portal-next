@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
 import { UserStorageWidget } from '@/app/components/UserStorageWidget/UserStorageWidget';
@@ -19,8 +20,30 @@ import { usePlatformLoad } from '@/lib/hooks/usePlatformLoad';
 import { useContainerImages, useImageRepositories } from '@/lib/hooks/useImages';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Session } from '@/lib/api/skaha';
+import { saveToken, hasToken } from '@/lib/auth/token-storage';
 
 export default function SciencePortalPage() {
+  // Get NextAuth session to extract and save token
+  const { data: session, status: sessionStatus } = useSession();
+
+  // Save token to localStorage when NextAuth session is available
+  useEffect(() => {
+    if (sessionStatus === 'authenticated' && session?.accessToken) {
+      // Only save if not already in localStorage
+      if (!hasToken()) {
+        console.log('\n' + '💾'.repeat(40));
+        console.log('💾 Main Page - Saving OIDC token to localStorage');
+        console.log('💾'.repeat(40));
+        console.log('📋 Token length:', session.accessToken.length);
+        console.log('📋 FULL TOKEN:');
+        console.log(session.accessToken);
+        console.log('💾'.repeat(40) + '\n');
+
+        saveToken(session.accessToken);
+      }
+    }
+  }, [session, sessionStatus]);
+
   // Get authentication status and query client for cache management
   const { data: authStatus, isLoading: isAuthLoading } = useAuthStatus();
   const isAuthenticated = authStatus?.authenticated ?? false;

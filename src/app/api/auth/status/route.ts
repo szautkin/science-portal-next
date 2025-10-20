@@ -1,8 +1,12 @@
+// Updated: 1760993000
 /**
  * Auth Status API Route
  *
  * GET /api/auth/status
  * Returns current authentication status and user information (whoami)
+ *
+ * OIDC Mode: Decodes JWT token from Authorization header
+ * CANFAR Mode: Calls /ac/whoami
  */
 
 import { NextRequest } from 'next/server';
@@ -53,7 +57,78 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
 
   logger.logRequest(request);
 
-  const authHeaders = forwardAuthHeader(request);
+  // Check if using OIDC mode
+  const isOIDC = process.env.NEXT_USE_CANFAR !== 'true';
+
+  console.log('\n' + '🔍'.repeat(40));
+  console.log('🔍 /api/auth/status - Mode Detection:');
+  console.log('🔍'.repeat(40));
+  console.log('📋 NEXT_USE_CANFAR:', process.env.NEXT_USE_CANFAR);
+  console.log('📋 NEXT_USE_CANFAR type:', typeof process.env.NEXT_USE_CANFAR);
+  console.log('📋 isOIDC:', isOIDC);
+  console.log('📋 Authorization header:', request.headers.get('authorization') ? 'present' : 'missing');
+  console.log('🔍'.repeat(40) + '\n');
+
+  if (isOIDC) {
+    // In OIDC mode, decode the JWT token to get user info
+    // instead of calling external whoami endpoint
+
+    // First, try to get token from Authorization header (for client requests)
+    let token = request.headers.get('authorization')?.replace('Bearer ', '');
+
+    // If no header, get token from NextAuth session (for server-side requests)
+    if (!token) {
+      logger.info('No Authorization header, checking NextAuth session');
+      const { auth } = await import('@/auth');
+      const session = await auth();
+
+      if (session?.accessToken) {
+        token = session.accessToken;
+        logger.info('Using token from NextAuth session');
+      }
+    }
+
+    if (!token) {
+      logger.info('No token found - user not authenticated');
+      return successResponse<AuthStatus>({ authenticated: false });
+    }
+
+    try {
+      // Decode JWT to extract user info (without verification - the SRC API will verify it)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        logger.logError(HTTP_STATUS.BAD_REQUEST, 'Invalid JWT token format');
+        return successResponse<AuthStatus>({ authenticated: false });
+      }
+
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+
+      // Extract user info from JWT claims
+      const user: User = {
+        username: payload.preferred_username || payload.sub || 'user',
+        email: payload.email || undefined,
+        displayName: payload.name || payload.preferred_username || undefined,
+        firstName: payload.given_name || undefined,
+        lastName: payload.family_name || undefined,
+      };
+
+      logger.info('OIDC user authenticated from JWT token', { username: user.username });
+
+      const result: AuthStatus = {
+        authenticated: true,
+        user,
+      };
+
+      logger.logSuccess(HTTP_STATUS.OK, result);
+      return successResponse<AuthStatus>(result);
+    } catch (error) {
+      logger.logError(HTTP_STATUS.INTERNAL_SERVER_ERROR, 'Failed to decode JWT token', error);
+      return successResponse<AuthStatus>({ authenticated: false });
+    }
+  }
+
+  // CANFAR mode: Forward Authorization header to CANFAR whoami
+  const authHeaders = await forwardAuthHeader(request);
   const externalUrl = `${serverApiConfig.login.baseUrl}/whoami`;
 
   logger.logExternalCall(externalUrl, 'GET', { ...authHeaders, 'Accept': 'application/json' });

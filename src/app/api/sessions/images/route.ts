@@ -44,7 +44,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     return methodNotAllowed(['GET']);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v1/image`,

@@ -3,9 +3,20 @@
  *
  * Manages authentication tokens in browser storage.
  * Uses localStorage by default for persistence across page reloads.
+ *
+ * Note: When using OIDC mode, tokens are managed by NextAuth via cookies.
+ * This storage is only used for CANFAR mode.
  */
 
 const TOKEN_KEY = 'canfar_auth_token';
+
+/**
+ * Check if currently using OIDC authentication mode
+ */
+function isOIDCMode(): boolean {
+  return typeof window !== 'undefined' &&
+         process.env.NEXT_PUBLIC_USE_CANFAR !== 'true';
+}
 
 /**
  * Save authentication token
@@ -45,15 +56,32 @@ export function hasToken(): boolean {
 /**
  * Get Authorization header value
  *
+ * Returns Bearer token from localStorage for both OIDC and CANFAR modes
+ *
  * @returns Object with Authorization header or empty object if no token
  */
 export function getAuthHeader(): Record<string, string> {
   const token = getToken();
-  if (!token) return {};
 
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+  console.log('\n' + '🔑'.repeat(40));
+  console.log('🔑 getAuthHeader() - Reading token from localStorage');
+  console.log('🔑'.repeat(40));
+  if (token) {
+    console.log('✅ Token found in localStorage');
+    console.log('📋 Token length:', token.length);
+    console.log('📋 First 100 chars:', token.substring(0, 100));
+    console.log('📋 FULL TOKEN:');
+    console.log(token);
+    console.log('🔑'.repeat(40) + '\n');
+
+    return {
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
+  console.log('❌ No token found in localStorage');
+  console.log('🔑'.repeat(40) + '\n');
+  return {};
 }
 
 /**

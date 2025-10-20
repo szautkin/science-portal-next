@@ -4,7 +4,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AppBar } from '@/app/components/AppBar/AppBar';
 import { AppBarProps } from '@/app/types/AppBarProps';
 import { LoginModal } from '@/app/components/LoginModal/LoginModal';
-import { useAuthStatus, useLogin, useLogout } from '@/lib/hooks/useAuth';
+import {
+  useAuthStatus,
+  useLogin,
+  useLogout,
+  useOIDCLogin,
+  useAuthModeSync,
+} from '@/lib/hooks/useAuth';
 import type { LoginCredentials } from '@/lib/api/login';
 import {
   PersonOutline,
@@ -46,6 +52,10 @@ export function AppBarWithAuth({
   const { data: authStatus, isLoading: isCheckingAuth } = useAuthStatus();
   const { mutate: login, isPending: isLoggingIn, error: loginError } = useLogin();
   const { mutate: logout } = useLogout();
+  const { login: oidcLogin, isOIDCMode } = useOIDCLogin();
+
+  // Sync auth mode from environment
+  useAuthModeSync();
 
   // Check for showLogin URL parameter on mount (after logout redirect)
   useEffect(() => {
@@ -140,27 +150,32 @@ export function AppBarWithAuth({
   });
 
   // Menu items shown when authenticated
+  // CANFAR-specific items only show in CANFAR mode
   const authenticatedMenuItems = [
-    {
-      label: 'Update Profile',
-      onClick: handleUpdateProfile,
-      icon: <PersonOutline fontSize="small" />,
-    },
-    {
-      label: 'Reset Password',
-      onClick: handleResetPassword,
-      icon: <VpnKey fontSize="small" />,
-    },
-    {
-      label: 'Obtain Certificate',
-      onClick: handleObtainCertificate,
-      icon: <Verified fontSize="small" />,
-    },
+    ...(!isOIDCMode
+      ? [
+          {
+            label: 'Update Profile',
+            onClick: handleUpdateProfile,
+            icon: <PersonOutline fontSize="small" />,
+          },
+          {
+            label: 'Reset Password',
+            onClick: handleResetPassword,
+            icon: <VpnKey fontSize="small" />,
+          },
+          {
+            label: 'Obtain Certificate',
+            onClick: handleObtainCertificate,
+            icon: <Verified fontSize="small" />,
+          },
+        ]
+      : []),
     {
       label: 'Logout',
       onClick: handleLogout,
       icon: <LogoutIcon fontSize="small" />,
-      divider: true,
+      divider: !isOIDCMode, // Only show divider if CANFAR items are present
     },
   ];
 
@@ -179,14 +194,21 @@ export function AppBarWithAuth({
   // Menu items for loading state - use dummy to keep button visible
   const loadingMenuItem = dummyMenuItem;
 
-  // Handle account button click - open login modal when not authenticated
+  // Handle account button click - open login modal or redirect to OIDC provider
   const handleAccountButtonClick = useCallback(() => {
     console.log('handleAccountButtonClick called in AppBarWithAuth');
     if (!isCheckingAuth && !isAuthenticated && showLoginButton) {
-      console.log('Opening login modal');
-      handleOpenLogin();
+      if (isOIDCMode) {
+        // For OIDC, redirect to provider
+        console.log('Redirecting to OIDC provider');
+        oidcLogin();
+      } else {
+        // For CANFAR, open login modal
+        console.log('Opening login modal');
+        handleOpenLogin();
+      }
     }
-  }, [isCheckingAuth, isAuthenticated, showLoginButton, handleOpenLogin]);
+  }, [isCheckingAuth, isAuthenticated, showLoginButton, isOIDCMode, oidcLogin, handleOpenLogin]);
 
   // Determine menu items to pass
   const menuItemsToPass = isCheckingAuth
@@ -228,13 +250,16 @@ export function AppBarWithAuth({
         variant={variant}
         sx={sx}
       />
-      <LoginModal
-        open={loginModalOpen}
-        onClose={handleCloseLogin}
-        onSubmit={handleLogin}
-        isLoading={isLoggingIn}
-        errorMessage={loginError?.message}
-      />
+      {/* Only show login modal in CANFAR mode */}
+      {!isOIDCMode && (
+        <LoginModal
+          open={loginModalOpen}
+          onClose={handleCloseLogin}
+          onSubmit={handleLogin}
+          isLoading={isLoggingIn}
+          errorMessage={loginError?.message}
+        />
+      )}
     </>
   );
 }

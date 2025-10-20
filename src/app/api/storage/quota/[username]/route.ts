@@ -33,7 +33,7 @@ export const GET = withErrorHandling(async (
     return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
   const storageUrl = serverApiConfig.storage.baseUrl;
 
   const response = await fetchExternalApi(

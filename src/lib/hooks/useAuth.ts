@@ -1,9 +1,15 @@
+'use client';
+
 /**
- * TanStack Query hooks for Authentication
+ * Unified Authentication Hooks
  *
- * Provides hooks for user authentication and authorization.
+ * Provides a consistent API for authentication that works with both:
+ * - CANFAR custom auth (when NEXT_USE_CANFAR=true)
+ * - OIDC via NextAuth (when NEXT_USE_CANFAR=false)
  */
 
+import { useEffect } from 'react';
+import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react';
 import {
   useQuery,
   useMutation,
@@ -12,15 +18,40 @@ import {
   type UseMutationOptions,
 } from '@tanstack/react-query';
 import {
-  login,
-  logout,
-  getAuthStatus,
+  login as canfarLogin,
+  logout as canfarLogout,
+  getAuthStatus as canfarGetAuthStatus,
   getUserDetails,
   checkPermission,
   type User,
   type LoginCredentials,
   type AuthStatus,
 } from '@/lib/api/login';
+
+// Client-side auth mode detection
+function isCanfarMode(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  // IMPORTANT: Always use environment variable as source of truth
+  const envMode = process.env.NEXT_PUBLIC_USE_CANFAR === 'true';
+  const storageMode = localStorage.getItem('AUTH_MODE');
+
+  console.log('🔍 Client-side mode detection:');
+  console.log('  - NEXT_PUBLIC_USE_CANFAR:', process.env.NEXT_PUBLIC_USE_CANFAR);
+  console.log('  - localStorage AUTH_MODE:', storageMode);
+  console.log('  - Resolved to CANFAR mode:', envMode);
+
+  // Sync localStorage to match environment
+  const correctMode = envMode ? 'CANFAR' : 'OIDC';
+  if (storageMode !== correctMode) {
+    console.log(`  - Updating localStorage from "${storageMode}" to "${correctMode}"`);
+    localStorage.setItem('AUTH_MODE', correctMode);
+  }
+
+  return envMode;
+}
 
 /**
  * Query keys for auth
@@ -35,42 +66,85 @@ export const authKeys = {
 
 /**
  * Get current authentication status
- *
- * @example
- * ```tsx
- * const { data: authStatus } = useAuthStatus();
- *
- * if (authStatus?.authenticated) {
- *   console.log('User:', authStatus.user);
- * }
- * ```
+ * Works with both CANFAR and OIDC auth
  */
 export function useAuthStatus(
   options?: Omit<UseQueryOptions<AuthStatus>, 'queryKey' | 'queryFn'>
 ) {
-  return useQuery({
+  const { data: session, status } = useSession();
+  const isCanfar = isCanfarMode();
+
+  console.log('🔍 useAuthStatus called:', { isCanfar, sessionStatus: status });
+
+  // For CANFAR mode, use existing auth status check
+  const canfarAuthStatus = useQuery({
     queryKey: authKeys.status(),
-    queryFn: getAuthStatus,
-    // Don't provide initialData - let it check token on mount
-    // Keep auth status fresh for 1 minute
+    queryFn: () => {
+      console.log('📋 CANFAR mode - calling /api/auth/status (makes API call to /ac/whoami)');
+      return canfarGetAuthStatus();
+    },
+    enabled: isCanfar,
     staleTime: 60000,
-    // Cache for 5 minutes
     gcTime: 5 * 60 * 1000,
-    // Refetch on window focus to catch session expiry
     refetchOnWindowFocus: true,
-    // Retry once on failure
     retry: 1,
     ...options,
   });
+
+  // For OIDC mode, use NextAuth session directly (no React Query wrapper)
+  // This ensures immediate updates when session state changes
+  useEffect(() => {
+    if (!isCanfar && status === 'authenticated' && session?.accessToken) {
+      // Store the access token in localStorage for API calls
+      const { saveToken } = require('@/lib/auth/token-storage');
+      saveToken(session.accessToken);
+      console.log('  - Saved access token to localStorage for API calls');
+    }
+  }, [isCanfar, status, session?.accessToken]);
+
+  // In OIDC mode, directly return NextAuth session state (no React Query)
+  if (!isCanfar) {
+    const oidcAuthStatus: AuthStatus =
+      status === 'authenticated' && session?.user
+        ? {
+            authenticated: true,
+            user: {
+              username: session.user.username || session.user.email?.split('@')[0] || 'user',
+              email: session.user.email || undefined,
+              displayName: session.user.name || undefined,
+              firstName: session.user.firstName || undefined,
+              lastName: session.user.lastName || undefined,
+            },
+          }
+        : { authenticated: false };
+
+    console.log('🔍 useAuthStatus returning (OIDC):', {
+      isLoading: status === 'loading',
+      isAuthenticated: oidcAuthStatus.authenticated,
+      username: oidcAuthStatus.user?.username,
+    });
+
+    // Return in React Query format for compatibility
+    return {
+      data: oidcAuthStatus,
+      isLoading: status === 'loading',
+      isError: false,
+      error: null,
+      refetch: () => Promise.resolve({ data: oidcAuthStatus } as any),
+    } as any;
+  }
+
+  // CANFAR mode uses React Query
+  console.log('🔍 useAuthStatus returning (CANFAR):', {
+    isLoading: canfarAuthStatus.isLoading,
+    isAuthenticated: canfarAuthStatus.data?.authenticated,
+  });
+
+  return canfarAuthStatus;
 }
 
 /**
  * Get user details
- *
- * @example
- * ```tsx
- * const { data: user } = useUserDetails('janedoe');
- * ```
  */
 export function useUserDetails(
   username: string,
@@ -86,11 +160,6 @@ export function useUserDetails(
 
 /**
  * Check user permission
- *
- * @example
- * ```tsx
- * const { data: canWrite } = usePermission('janedoe', '/vospace/janedoe/data', 'write');
- * ```
  */
 export function usePermission(
   username: string,
@@ -108,24 +177,28 @@ export function usePermission(
 
 /**
  * Login mutation
- *
- * @example
- * ```tsx
- * const { mutate: loginUser, isPending } = useLogin();
- *
- * loginUser({
- *   username: 'janedoe',
- *   password: 'secret',
- * });
- * ```
+ * Automatically uses the correct auth method based on environment
  */
 export function useLogin(options?: UseMutationOptions<User, Error, LoginCredentials>) {
   const queryClient = useQueryClient();
+  const isCanfar = isCanfarMode();
 
   return useMutation({
-    mutationFn: login,
+    mutationFn: async (credentials: LoginCredentials) => {
+      if (isCanfar) {
+        // CANFAR auth
+        return canfarLogin(credentials);
+      } else {
+        // OIDC auth - redirect to NextAuth signin
+        // Note: OIDC doesn't use username/password, but we'll trigger the flow
+        await nextAuthSignIn('oidc', { callbackUrl: '/science-portal' });
+        // Return a placeholder user as the actual auth happens via redirect
+        return {
+          username: credentials.username,
+        } as User;
+      }
+    },
     onSuccess: () => {
-      // Invalidate auth status to refetch with new user
       queryClient.invalidateQueries({ queryKey: authKeys.status() });
     },
     ...options,
@@ -134,23 +207,59 @@ export function useLogin(options?: UseMutationOptions<User, Error, LoginCredenti
 
 /**
  * Logout mutation
- *
- * @example
- * ```tsx
- * const { mutate: logoutUser } = useLogout();
- *
- * logoutUser();
- * ```
+ * Automatically uses the correct auth method based on environment
  */
 export function useLogout(options?: UseMutationOptions<void, Error, void>) {
   const queryClient = useQueryClient();
+  const isCanfar = isCanfarMode();
 
   return useMutation({
-    mutationFn: logout,
+    mutationFn: async () => {
+      if (isCanfar) {
+        // CANFAR logout
+        await canfarLogout();
+      } else {
+        // OIDC logout - use NextAuth signOut
+        await nextAuthSignOut({ callbackUrl: '/science-portal' });
+      }
+    },
     onSuccess: () => {
-      // Clear all queries on logout
       queryClient.clear();
     },
     ...options,
   });
+}
+
+/**
+ * Hook to trigger OIDC login
+ * Only works in OIDC mode
+ */
+export function useOIDCLogin() {
+  const isCanfar = isCanfarMode();
+
+  return {
+    login: async () => {
+      if (!isCanfar) {
+        try {
+          await nextAuthSignIn('oidc', { callbackUrl: '/science-portal' });
+        } catch (error) {
+          console.error('Failed to initiate OIDC login:', error);
+          throw error;
+        }
+      }
+    },
+    isOIDCMode: !isCanfar,
+  };
+}
+
+/**
+ * Sync auth mode from environment to localStorage on mount
+ */
+export function useAuthModeSync() {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const envMode = process.env.NEXT_PUBLIC_USE_CANFAR === 'true' ? 'CANFAR' : 'OIDC';
+      localStorage.setItem('AUTH_MODE', envMode);
+    }
+  }, []);
 }

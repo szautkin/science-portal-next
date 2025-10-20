@@ -43,7 +43,7 @@ export const GET = withErrorHandling(async (
     return errorResponse('Username is required', HTTP_STATUS.BAD_REQUEST);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
   const storageUrl = serverApiConfig.storage.baseUrl;
   const endpoint = path
     ? `${storageUrl}/users/${username}/files/${path}`
@@ -93,7 +93,7 @@ export const POST = withErrorHandling(async (
   }
 
   const formData = await request.formData();
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
   const storageUrl = serverApiConfig.storage.baseUrl;
 
   const response = await fetchExternalApi(
@@ -133,7 +133,7 @@ export const DELETE = withErrorHandling(async (
     return errorResponse('Path is required for deletion', HTTP_STATUS.BAD_REQUEST);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
   const storageUrl = serverApiConfig.storage.baseUrl;
 
   const response = await fetchExternalApi(
@@ -172,7 +172,7 @@ export const PUT = withErrorHandling(async (
     return errorResponse('Path is required for directory creation', HTTP_STATUS.BAD_REQUEST);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
   const storageUrl = serverApiConfig.storage.baseUrl;
 
   const response = await fetchExternalApi(

@@ -32,7 +32,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     return methodNotAllowed(['GET']);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
 
   logger.info(`Fetching image repositories from ${serverApiConfig.skaha.baseUrl}/v1/repository`);
 

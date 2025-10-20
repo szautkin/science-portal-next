@@ -6,12 +6,59 @@
  */
 
 /**
+ * Check if using OIDC authentication mode
+ */
+function isOIDCMode(): boolean {
+  return process.env.NEXT_USE_CANFAR !== 'true';
+}
+
+/**
+ * Get Skaha API base URL based on auth mode
+ * - OIDC mode: Uses NEXT_PUBLIC_SRC_SKAHA_API (src.canfar.net/skaha - accepts SKA IAM tokens)
+ * - CANFAR mode: Uses SKAHA_API (ws-uv.canfar.net/skaha - accepts CANFAR auth)
+ */
+function getSkahaBaseUrl(): string {
+  if (isOIDCMode()) {
+    // OIDC mode: Use SRC Skaha API that accepts SKA IAM tokens
+    const srcSkahaApi = process.env.NEXT_PUBLIC_SRC_SKAHA_API || process.env.SRC_SKAHA_API || 'https://src.canfar.net/skaha';
+    console.log('🔍 Server config - OIDC mode, using SRC Skaha API:', srcSkahaApi);
+    return srcSkahaApi;
+  } else {
+    // CANFAR mode: Use standard CANFAR Skaha API
+    const canfarSkahaApi = process.env.SKAHA_API || process.env.NEXT_PUBLIC_SKAHA_API;
+    console.log('🔍 Server config - CANFAR mode, using CANFAR Skaha API:', canfarSkahaApi);
+    return canfarSkahaApi || '';
+  }
+}
+
+/**
+ * Get Storage API base URL based on auth mode
+ * - OIDC mode: Uses SRC Cavern API (src.canfar.net/cavern - accepts SKA IAM tokens)
+ * - CANFAR mode: Uses SERVICE_STORAGE_API (standard CANFAR storage)
+ */
+function getStorageBaseUrl(): string {
+  if (isOIDCMode()) {
+    // OIDC mode: Use SRC Cavern API that accepts SKA IAM tokens
+    const srcCavernApi = process.env.NEXT_PUBLIC_SRC_CAVERN_API || process.env.SRC_CAVERN_API || 'https://src.canfar.net/cavern';
+    console.log('🔍 Server config - OIDC mode, using SRC Cavern API:', srcCavernApi);
+    return srcCavernApi;
+  } else {
+    // CANFAR mode: Use standard CANFAR storage API
+    const canfarStorageApi = process.env.SERVICE_STORAGE_API || process.env.NEXT_PUBLIC_SERVICE_STORAGE_API;
+    console.log('🔍 Server config - CANFAR mode, using CANFAR Storage API:', canfarStorageApi);
+    return canfarStorageApi || '';
+  }
+}
+
+/**
  * Server-side API configuration
  * Uses server-only environment variables (without NEXT_PUBLIC_ prefix)
+ * In OIDC mode, uses SRC endpoints (src.canfar.net)
+ * In CANFAR mode, uses CANFAR endpoints (ws-*.canfar.net)
  */
 export const serverApiConfig = {
   storage: {
-    baseUrl: process.env.SERVICE_STORAGE_API || process.env.NEXT_PUBLIC_SERVICE_STORAGE_API || '',
+    baseUrl: getStorageBaseUrl(),
     timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
   login: {
@@ -19,7 +66,7 @@ export const serverApiConfig = {
     timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
   skaha: {
-    baseUrl: process.env.SKAHA_API || process.env.NEXT_PUBLIC_SKAHA_API || '',
+    baseUrl: getSkahaBaseUrl(),
     timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
 } as const;

@@ -33,7 +33,7 @@ export const GET = withErrorHandling(async (
   }
 
   const sessionId = params.id;
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v1/session/${sessionId}`,
@@ -71,7 +71,7 @@ export const DELETE = withErrorHandling(async (
   }
 
   const sessionId = params.id;
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v1/session/${sessionId}`,

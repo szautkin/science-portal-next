@@ -34,16 +34,20 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     return methodNotAllowed(['GET']);
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
+  console.log('📨 Session GET route - authHeaders received:', authHeaders);
+
+  const finalHeaders = {
+    ...authHeaders,
+    'Accept': 'application/json',
+  };
+  console.log('📨 Session GET route - final headers:', finalHeaders);
 
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v1/session`,
     {
       method: 'GET',
-      headers: {
-        ...authHeaders,
-        'Accept': 'application/json',
-      },
+      headers: finalHeaders,
     },
     serverApiConfig.skaha.timeout
   );
@@ -117,7 +121,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     });
   }
 
-  const authHeaders = forwardAuthHeader(request);
+  const authHeaders = await forwardAuthHeader(request);
 
   // Build headers for the request
   const headers: HeadersInit = {
