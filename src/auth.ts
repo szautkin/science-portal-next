@@ -132,7 +132,8 @@ async function refreshAccessToken(token: any) {
 function initializeAuth() {
   if (isOIDCAuth()) {
     try {
-      const oidcConfig = getOIDCConfig();
+      // Allow missing OIDC config during build time (will use dummy values)
+      const oidcConfig = getOIDCConfig(true);
 
       // Configure OIDC provider
       authConfig.providers = [
@@ -164,7 +165,10 @@ function initializeAuth() {
       ];
     } catch (error) {
       console.error('Failed to initialize OIDC configuration:', error);
-      throw error;
+      // Don't throw during build - allow build to continue with dummy config
+      if (process.env.NEXT_PHASE !== 'phase-production-build') {
+        throw error;
+      }
     }
   }
 

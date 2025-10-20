@@ -47,8 +47,9 @@ export function isOIDCAuth(): boolean {
 
 /**
  * Get OIDC configuration from environment variables
+ * @param allowMissing - If true, returns dummy config when vars are missing (for build time)
  */
-export function getOIDCConfig(): OIDCConfig {
+export function getOIDCConfig(allowMissing = false): OIDCConfig {
   const issuer = process.env.NEXT_OIDC_URI || process.env.NEXT_PUBLIC_OIDC_URI;
   const clientId = process.env.NEXT_OIDC_CLIENT_ID || process.env.NEXT_PUBLIC_OIDC_CLIENT_ID;
   const clientSecret = process.env.NEXT_OIDC_CLIENT_SECRET || '';
@@ -56,7 +57,22 @@ export function getOIDCConfig(): OIDCConfig {
   const redirectUrl = process.env.NEXT_OIDC_REDIRECT_URI || process.env.NEXT_PUBLIC_OIDC_REDIRECT_URI;
   const scope = process.env.NEXT_OIDC_SCOPE || process.env.NEXT_PUBLIC_OIDC_SCOPE || 'openid profile email';
 
+  const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
+
   if (!issuer || !clientId || !callbackUrl || !redirectUrl) {
+    // During build time or when explicitly allowed, return dummy config
+    if (isBuildTime || allowMissing) {
+      console.warn('⚠️ OIDC config missing - using dummy values (build time)');
+      return {
+        issuer: issuer || 'https://example.com/',
+        clientId: clientId || 'dummy-client-id',
+        clientSecret: clientSecret || 'dummy-secret',
+        callbackUrl: callbackUrl || 'http://localhost:3000/science-portal',
+        redirectUrl: redirectUrl || 'http://localhost:3000/api/auth/callback/oidc',
+        scope,
+      };
+    }
+
     throw new Error(
       'Missing required OIDC configuration. Please check your environment variables:\n' +
       `- NEXT_OIDC_URI: ${issuer ? '✓' : '✗'}\n` +

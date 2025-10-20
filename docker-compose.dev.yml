@@ -1,0 +1,31 @@
+version: '3.8'
+
+# Simple docker-compose for development/testing
+# This runs only the Next.js app without Nginx
+
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_LOGIN_API: https://ws-cadc.canfar.net/ac
+        NEXT_PUBLIC_SKAHA_API: https://ws-uv.canfar.net/skaha
+        NEXT_PUBLIC_SRC_SKAHA_API: https://src.canfar.net/skaha
+        NEXT_PUBLIC_SRC_CAVERN_API: https://src.canfar.net/cavern
+        NEXT_PUBLIC_API_TIMEOUT: "30000"
+        NEXT_PUBLIC_USE_CANFAR: "false"
+        NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS: "false"
+    container_name: science-portal-nextjs
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    environment:
+      # Override specific vars for Docker
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXT_OIDC_CALLBACK_URI=http://localhost:3000/science-portal
+      - NEXT_OIDC_REDIRECT_URI=http://localhost:3000/api/auth/callback/oidc
+      - NEXT_PUBLIC_OIDC_CALLBACK_URI=http://localhost:3000/science-portal
+      - NEXT_PUBLIC_OIDC_REDIRECT_URI=http://localhost:3000/api/auth/callback/oidc

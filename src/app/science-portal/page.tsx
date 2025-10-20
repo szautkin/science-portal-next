@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
@@ -319,14 +319,16 @@ export default function SciencePortalPage() {
                 minWidth: 0, // Prevent flex item from overflowing
               }}
             >
-              <LaunchFormWidget
-              helpUrl="https://www.opencadc.org/science-containers/"
-              imagesByType={imagesByType}
-              repositoryHosts={imageRepositories.map(repo => repo.host).filter((host): host is string => Boolean(host))}
-              isLoading={isLoadingLaunchForm}
-              onRefresh={handleLaunchFormRefresh}
-              activeSessions={sessions}
-            />
+              <Suspense fallback={<Box sx={{ p: 3 }}>Loading...</Box>}>
+                <LaunchFormWidget
+                  helpUrl="https://www.opencadc.org/science-containers/"
+                  imagesByType={imagesByType}
+                  repositoryHosts={imageRepositories.map(repo => repo.host).filter((host): host is string => Boolean(host))}
+                  isLoading={isLoadingLaunchForm}
+                  onRefresh={handleLaunchFormRefresh}
+                  activeSessions={sessions}
+                />
+              </Suspense>
             </Box>
 
             {/* PlatformLoad - 40% width on large screens */}
