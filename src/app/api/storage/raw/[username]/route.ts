@@ -12,6 +12,7 @@ import {
   fetchExternalApi,
   forwardAuthHeader
 } from '@/app/api/lib/api-utils';
+import { serverApiConfig } from '@/app/api/lib/server-config';
 import { HTTP_STATUS, API_TIMEOUTS } from '@/app/api/lib/http-constants';
 
 interface StorageData {
@@ -63,14 +64,15 @@ export const GET = withErrorHandling(async (
   }
 
   const authHeaders = await forwardAuthHeader(request);
-  // Use SERVICE_STORAGE_API with username appended
-  const storageBaseUrl = process.env.SERVICE_STORAGE_API || '';
-  const storageUrl = `${storageBaseUrl}${username}`;
+  // Use mode-aware storage API (SRC Cavern for OIDC, CANFAR for CANFAR mode)
+  const storageBaseUrl = serverApiConfig.storage.baseUrl;
+  const storageUrl = `${storageBaseUrl}/nodes/home/${username}`;
 
   console.log('[Storage API] Fetching storage data:', {
     username,
     url: storageUrl,
     baseUrl: storageBaseUrl,
+    mode: process.env.NEXT_USE_CANFAR !== 'true' ? 'OIDC' : 'CANFAR',
   });
 
   const response = await fetchExternalApi(

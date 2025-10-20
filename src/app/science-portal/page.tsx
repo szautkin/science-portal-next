@@ -11,7 +11,7 @@ import { Footer } from '@/app/components/Footer/Footer';
 import { Box } from '@/app/components/Box/Box';
 import { Container } from '@mui/material';
 import { ThemeToggle } from '@/app/components/ThemeToggle/ThemeToggle';
-import { appBarWithUserMenu, CanfarLogo } from '@/stories/shared/navigation';
+import { appBarWithUserMenu, CanfarLogo, SRCNetLogo } from '@/stories/shared/navigation';
 import type { SessionCardProps } from '@/app/types/SessionCardProps';
 import type { PlatformLoadData } from '@/app/types/PlatformLoadProps';
 import { useAuthStatus } from '@/lib/hooks/useAuth';
@@ -23,6 +23,9 @@ import type { Session } from '@/lib/api/skaha';
 import { saveToken, hasToken } from '@/lib/auth/token-storage';
 
 export default function SciencePortalPage() {
+  // Check if in OIDC mode
+  const isOIDCMode = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_CANFAR !== 'true';
+
   // Get NextAuth session to extract and save token
   const { data: session, status: sessionStatus } = useSession();
 
@@ -251,8 +254,8 @@ export default function SciencePortalPage() {
         elevation={0}
         wordmark="Science Portal"
         logoHref="/"
-        logo={<CanfarLogo />}
-        links={appBarWithUserMenu.links}
+        logo={isOIDCMode ? <SRCNetLogo /> : <CanfarLogo />}
+        links={isOIDCMode ? [] : appBarWithUserMenu.links}
         accountButton={<ThemeToggle size="md" />}
         showLoginButton={true}
       />
