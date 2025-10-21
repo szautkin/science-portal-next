@@ -51,8 +51,8 @@ export function LaunchFormWidgetImpl({
       setLaunchedSession(null);
 
       try {
-        // Import launchSession and getSession from skaha API
-        const { launchSession, getSession } = await import('@/lib/api/skaha');
+        // Import launchSession from skaha API
+        const { launchSession } = await import('@/lib/api/skaha');
 
         // Determine which image to use
         const imageToUse = formData.image
@@ -81,41 +81,9 @@ export function LaunchFormWidgetImpl({
           await sessionLaunchFormProps.onLaunch(formData);
         }
 
-        setRequestStatus('provisioning');
-
-        // Poll for session details to get the connectURL and status
-        let attempts = 0;
-        const maxAttempts = 10; // Try for about 10 seconds
-        let sessionDetails = initialSession;
-
-        while (attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          try {
-            sessionDetails = await getSession(initialSession.id);
-
-            // If session is Running and has a connectUrl, we're done
-            if (sessionDetails.status === 'Running' && sessionDetails.connectUrl) {
-              setLaunchedSession(sessionDetails);
-              setRequestStatus('success');
-              return;
-            }
-
-            // If session failed, show error
-            if (sessionDetails.status === 'Failed' || sessionDetails.status === 'Error') {
-              setRequestStatus('error');
-              setRequestError('Session failed to start. Please try again.');
-              return;
-            }
-          } catch (fetchError) {
-            console.warn('Failed to fetch session details, retrying...', fetchError);
-          }
-
-          attempts++;
-        }
-
-        // If we've exhausted attempts, session is still pending
-        setLaunchedSession(sessionDetails);
+        // Session created successfully - modal will show success
+        // The 30-second delay in useLaunchSession hook will refetch all sessions
+        setLaunchedSession(initialSession);
         setRequestStatus('success');
       } catch (error) {
         setRequestStatus('error');

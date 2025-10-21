@@ -34,11 +34,7 @@ export function usePlatformLoad(
     queryFn: getPlatformLoad,
     // Only fetch if authenticated (default to true for backward compatibility)
     enabled: isAuthenticated !== false,
-    // Refetch every 60 seconds for fresh data
-    refetchInterval: isAuthenticated !== false ? 60000 : false,
-    refetchIntervalInBackground: false,
-    // Keep data fresh for 30 seconds
-    staleTime: 30000,
+    // No auto-refresh - only manual refresh via refresh button
     ...options,
   });
 }

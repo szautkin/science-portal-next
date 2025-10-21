@@ -23,13 +23,13 @@ import { serverApiConfig } from '@/app/api/lib/server-config';
  */
 export const GET = withErrorHandling(async (
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!validateMethod(request, ['GET'])) {
     return methodNotAllowed(['GET']);
   }
 
-  const sessionId = params.id;
+  const { id: sessionId } = await params;
   const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(

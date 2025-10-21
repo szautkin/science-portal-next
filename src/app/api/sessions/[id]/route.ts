@@ -26,13 +26,13 @@ import type { Session } from '@/lib/api/skaha';
  */
 export const GET = withErrorHandling(async (
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!validateMethod(request, ['GET'])) {
     return methodNotAllowed(['GET']);
   }
 
-  const sessionId = params.id;
+  const { id: sessionId } = await params;
   const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
@@ -64,13 +64,13 @@ export const GET = withErrorHandling(async (
  */
 export const DELETE = withErrorHandling(async (
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) => {
   if (!validateMethod(request, ['DELETE'])) {
     return methodNotAllowed(['DELETE']);
   }
 
-  const sessionId = params.id;
+  const { id: sessionId } = await params;
   const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(

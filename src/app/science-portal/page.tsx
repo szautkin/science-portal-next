@@ -116,20 +116,10 @@ export default function SciencePortalPage() {
     refetch: refetchRepositories
   } = useImageRepositories(isAuthenticated);
 
-  // SIMPLE LOADING LOGIC - ALL IN ONE PLACE:
-  // NOT authenticated → ALWAYS show loading
-  // IS authenticated → show loading ONLY while fetching (isLoading = true)
-  const isLoadingSessions = !isAuthenticated || isLoading;
-  const isLoadingPlatform = !isAuthenticated || isPlatformLoading;
-  const isLoadingLaunchForm = !isAuthenticated || isLoadingImages || isLoadingRepositories;
-  const isLoadingUserStorage = !isAuthenticated;
-
   // Mutation hooks for session actions
   const { mutate: deleteSession } = useDeleteSession({
     onSuccess: () => {
       console.log('Session deleted successfully');
-      // Explicitly refetch sessions to update the Active Sessions widget
-      refetchSessions();
     },
     onError: (error) => {
       console.error('Failed to delete session:', error);
@@ -144,6 +134,14 @@ export default function SciencePortalPage() {
       console.error('Failed to renew session:', error);
     },
   });
+
+  // LOADING LOGIC - ALL IN ONE PLACE:
+  // NOT authenticated → ALWAYS show loading
+  // IS authenticated → show loading while initial loading OR refetching (after 30s delay from mutations)
+  const isLoadingSessions = !isAuthenticated || isLoading || isFetching;
+  const isLoadingPlatform = !isAuthenticated || isPlatformLoading || isPlatformFetching;
+  const isLoadingLaunchForm = !isAuthenticated || isLoadingImages || isLoadingRepositories || isFetchingImages || isFetchingRepositories;
+  const isLoadingUserStorage = !isAuthenticated;
 
   // Transform Session data to SessionCardProps format with action handlers
   const activeSessions: SessionCardProps[] = useMemo(() => {

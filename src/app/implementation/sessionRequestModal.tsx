@@ -23,6 +23,33 @@ import { useTheme } from '@mui/material/styles';
 import { SessionRequestModalProps } from '../types/SessionRequestModalProps';
 
 /**
+ * Parse and format error messages for better user experience
+ */
+const parseErrorMessage = (error: string | undefined): string => {
+  if (!error) return 'An unknown error occurred';
+
+  // Match: "User X has reached the maximum of N active sessions."
+  const maxSessionsMatch = error.match(/reached the maximum of (\d+) active sessions/i);
+  if (maxSessionsMatch) {
+    const maxSessions = maxSessionsMatch[1];
+    return `You have reached the maximum limit of ${maxSessions} active sessions. Please delete an existing session before creating a new one.`;
+  }
+
+  // Match: "insufficient resources" or similar
+  if (error.match(/insufficient|not enough|unavailable/i)) {
+    return 'Insufficient resources available. Please try again later or request fewer resources.';
+  }
+
+  // Match: "quota exceeded"
+  if (error.match(/quota.*exceeded/i)) {
+    return 'Resource quota exceeded. Please delete unused sessions or contact support.';
+  }
+
+  // Default: return the original error, cleaned up
+  return error.trim();
+};
+
+/**
  * SessionRequestModal implementation component
  */
 export const SessionRequestModalImpl: React.FC<SessionRequestModalProps> = ({
@@ -37,6 +64,7 @@ export const SessionRequestModalImpl: React.FC<SessionRequestModalProps> = ({
   onRetry,
 }) => {
   const theme = useTheme();
+  const parsedError = parseErrorMessage(errorMessage);
 
   const getStatusIcon = () => {
     switch (status) {
@@ -83,7 +111,7 @@ export const SessionRequestModalImpl: React.FC<SessionRequestModalProps> = ({
       case 'success':
         return `Your ${sessionType} session "${sessionName}" is ready to use`;
       case 'error':
-        return errorMessage || 'An error occurred while creating your session';
+        return 'An error occurred while creating your session. See details below.';
     }
   };
 
@@ -224,8 +252,7 @@ export const SessionRequestModalImpl: React.FC<SessionRequestModalProps> = ({
                 },
               })}
             >
-              {errorMessage ||
-                'Please try again or contact support if the problem persists.'}
+              {parsedError}
             </Alert>
           )}
         </Box>

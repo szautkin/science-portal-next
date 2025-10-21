@@ -211,53 +211,41 @@ export async function launchSession(params: SessionLaunchParams): Promise<Sessio
   if (!response.ok) {
     const errorText = await response.text();
 
-    // Try to parse the error as JSON to extract the details
+    // Try to parse the error as JSON to extract a clean message
     try {
       const errorJson = JSON.parse(errorText);
-      // If there's a details field, use that for a more specific error message
-      if (errorJson.details) {
-        throw new Error(errorJson.details);
-      }
-      // Otherwise use the message field if available
-      if (errorJson.message) {
-        throw new Error(errorJson.message);
-      }
+      // Prefer details, then message, then error field
+      const errorMessage = errorJson.details?.trim() || errorJson.message || errorJson.error || errorText;
+      throw new Error(errorMessage);
     } catch (parseError) {
-      // If it's not JSON or parsing fails, use the raw text
+      // If JSON parsing fails (and it's not our thrown Error), use the raw text
+      if (parseError instanceof Error && parseError.message !== errorText) {
+        throw new Error(errorText || `Failed to launch session: ${response.status}`);
+      }
+      // Re-throw our clean error message
+      throw parseError;
     }
-
-    throw new Error(errorText || `Failed to launch session: ${response.status}`);
   }
 
   const result = await response.json();
 
-  // The API returns basic session info with the ID
-  // We need to fetch the full session details to get the connectURL
-  if (result.id) {
-    // Wait a moment for the session to be created
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Fetch the full session details
-    try {
-      const session = await getSession(result.id);
-      return session;
-    } catch (error) {
-      // If we can't fetch details yet, return what we have
-      console.warn('Could not fetch session details immediately:', error);
-      return {
-        id: result.id,
-        sessionId: result.id,
-        sessionType: params.sessionType,
-        sessionName: params.sessionName,
-        status: 'Pending' as SessionStatus,
-        containerImage: params.containerImage,
-        startedTime: new Date().toISOString(),
-        expiresTime: '',
-        memoryAllocated: `${params.ram}G`,
-        cpuAllocated: `${params.cores}`,
-        connectUrl: undefined,
-      };
-    }
+  // Return basic session info immediately
+  // The hook will trigger a refetch after 30 seconds to get full details
+  if (result.sessionId || result.id) {
+    const sessionId = (result.sessionId || result.id).trim(); // Remove any whitespace/newlines
+    return {
+      id: sessionId,
+      sessionId: sessionId,
+      sessionType: params.sessionType,
+      sessionName: params.sessionName,
+      status: 'Pending' as SessionStatus,
+      containerImage: params.containerImage,
+      startedTime: new Date().toISOString(),
+      expiresTime: '',
+      memoryAllocated: `${params.ram}G`,
+      cpuAllocated: `${params.cores}`,
+      connectUrl: undefined,
+    };
   }
 
   throw new Error('No session ID returned from API');

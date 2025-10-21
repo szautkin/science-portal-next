@@ -55,9 +55,7 @@ export function useSessions(
     queryFn: getSessions,
     // Only fetch if authenticated (default to true for backward compatibility)
     enabled: isAuthenticated !== false,
-    // Refetch sessions every 30 seconds when tab is visible
-    refetchInterval: isAuthenticated !== false ? 30000 : false,
-    refetchIntervalInBackground: false,
+    // No auto-refresh - only manual refresh and on user actions (delete, launch, extend)
     ...options,
   });
 }
@@ -142,14 +140,20 @@ export function useLaunchSession(
   options?: UseMutationOptions<Session, Error, SessionLaunchParams>
 ) {
   const queryClient = useQueryClient();
+  const { onSuccess: userOnSuccess, ...restOptions } = options || {};
 
   return useMutation({
+    ...restOptions,
     mutationFn: launchSession,
-    onSuccess: () => {
-      // Invalidate sessions list to refetch with new session
-      queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+    onSuccess: (...args) => {
+      // Call user's onSuccess callback if provided
+      userOnSuccess?.(...args);
+
+      // Wait 30 seconds before refetching to allow backend to create session
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+      }, 30000);
     },
-    ...options,
   });
 }
 
@@ -165,16 +169,23 @@ export function useLaunchSession(
  */
 export function useDeleteSession(options?: UseMutationOptions<void, Error, string>) {
   const queryClient = useQueryClient();
+  const { onSuccess: userOnSuccess, ...restOptions } = options || {};
 
   return useMutation({
+    ...restOptions,
     mutationFn: deleteSession,
-    onSuccess: (_, sessionId) => {
-      // Invalidate sessions list
-      queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
-      // Remove the specific session from cache
-      queryClient.removeQueries({ queryKey: sessionKeys.detail(sessionId) });
+    onSuccess: (data, sessionId, ...rest) => {
+      // Call user's onSuccess callback if provided
+      userOnSuccess?.(data, sessionId, ...rest);
+
+      // Wait 30 seconds before refetching to allow backend to process deletion
+      setTimeout(() => {
+        // Invalidate sessions list
+        queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+        // Remove the specific session from cache
+        queryClient.removeQueries({ queryKey: sessionKeys.detail(sessionId) });
+      }, 30000);
     },
-    ...options,
   });
 }
 
@@ -192,15 +203,22 @@ export function useRenewSession(
   options?: UseMutationOptions<Session, Error, { sessionId: string; hours: number }>
 ) {
   const queryClient = useQueryClient();
+  const { onSuccess: userOnSuccess, ...restOptions } = options || {};
 
   return useMutation({
+    ...restOptions,
     mutationFn: ({ sessionId, hours }) => renewSession(sessionId, hours),
-    onSuccess: (updatedSession) => {
-      // Update the specific session in cache
-      queryClient.setQueryData(sessionKeys.detail(updatedSession.id), updatedSession);
-      // Invalidate sessions list to show updated expiry
-      queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+    onSuccess: (updatedSession, variables, ...rest) => {
+      // Call user's onSuccess callback if provided
+      userOnSuccess?.(updatedSession, variables, ...rest);
+
+      // Wait 30 seconds before refetching to allow backend to process renewal
+      setTimeout(() => {
+        // Update the specific session in cache
+        queryClient.setQueryData(sessionKeys.detail(updatedSession.id), updatedSession);
+        // Invalidate sessions list to show updated expiry
+        queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+      }, 30000);
     },
-    ...options,
   });
 }

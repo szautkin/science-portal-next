@@ -33,7 +33,7 @@ interface RenewSessionParams {
  */
 export const POST = withErrorHandling(async (
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) => {
   const logger = createLogger('/api/sessions/[id]/renew', 'POST');
 
@@ -41,7 +41,7 @@ export const POST = withErrorHandling(async (
     return methodNotAllowed(['POST']);
   }
 
-  const sessionId = params.id;
+  const { id: sessionId } = await params;
 
   // Log the incoming request
   logger.logRequest(request);
@@ -72,8 +72,50 @@ export const POST = withErrorHandling(async (
     );
   }
 
-  const session: SkahaSessionResponse = await response.json();
-  logger.info(`Successfully renewed session: ${session.name}, new expiry: ${session.expiryTime}`);
-  logger.logSuccess(200, { sessionId: session.id, expiryTime: session.expiryTime });
-  return successResponse(session);
+  // Check if response has content
+  const contentType = response.headers.get('content-type');
+  logger.info(`Response content-type: ${contentType}, status: ${response.status}`);
+
+  // SKAHA might return empty response for renew action
+  const text = await response.text();
+  logger.info(`Response body length: ${text.length}, preview: ${text.substring(0, 200)}`);
+
+  if (!text || text.trim().length === 0) {
+    // Empty response - renew was successful but we need to fetch the updated session
+    logger.info('Empty response from renew action, fetching updated session details');
+
+    // Fetch the updated session details
+    const sessionResponse = await fetchExternalApi(
+      `${serverApiConfig.skaha.baseUrl}/v1/session/${sessionId}`,
+      {
+        method: 'GET',
+        headers: {
+          ...authHeaders,
+          'Accept': 'application/json',
+        },
+      },
+      serverApiConfig.skaha.timeout
+    );
+
+    if (!sessionResponse.ok) {
+      logger.logError(sessionResponse.status, 'Failed to fetch updated session after renew');
+      return errorResponse('Session renewed but failed to fetch updated details', sessionResponse.status);
+    }
+
+    const session: SkahaSessionResponse = await sessionResponse.json();
+    logger.info(`Successfully renewed session: ${session.name}, new expiry: ${session.expiryTime}`);
+    logger.logSuccess(200, { sessionId: session.id, expiryTime: session.expiryTime });
+    return successResponse(session);
+  }
+
+  // Try to parse as JSON
+  try {
+    const session: SkahaSessionResponse = JSON.parse(text);
+    logger.info(`Successfully renewed session: ${session.name}, new expiry: ${session.expiryTime}`);
+    logger.logSuccess(200, { sessionId: session.id, expiryTime: session.expiryTime });
+    return successResponse(session);
+  } catch (e) {
+    logger.logError(500, `Failed to parse renew response as JSON: ${e}`);
+    return errorResponse('Invalid response from renew action', 500);
+  }
 });
