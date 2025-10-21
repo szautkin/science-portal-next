@@ -89,4 +89,53 @@ export function getAuthHeader(): Record<string, string> {
  */
 export function clearAuth(): void {
   removeToken();
+  removeCredentials();
+}
+
+// Credentials storage for certificate generation
+const CREDENTIALS_KEY = 'canfar_auth_credentials';
+
+/**
+ * Save user credentials (for certificate generation with HTTP Basic Auth)
+ * Uses sessionStorage for better security (cleared on browser close)
+ *
+ * @param username - User's username
+ * @param password - User's password
+ */
+export function saveCredentials(username: string, password: string): void {
+  if (typeof window === 'undefined') return;
+  // Store in sessionStorage (cleared when browser closes) for better security
+  const credentials = { username, password };
+  sessionStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials));
+}
+
+/**
+ * Get stored credentials
+ *
+ * @returns Credentials object with username and password, or null if not found
+ */
+export function getCredentials(): { username: string; password: string } | null {
+  if (typeof window === 'undefined') return null;
+  const stored = sessionStorage.getItem(CREDENTIALS_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove stored credentials
+ */
+export function removeCredentials(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(CREDENTIALS_KEY);
+}
+
+/**
+ * Check if credentials exist
+ */
+export function hasCredentials(): boolean {
+  return getCredentials() !== null;
 }

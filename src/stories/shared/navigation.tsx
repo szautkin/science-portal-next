@@ -26,6 +26,9 @@ import {
   SCIENCE_PORTAL_URL,
   CADC_SEARCH_URL,
   OPENSTACK_CLOUD_URL,
+  UPDATE_PROFILE_URL,
+  RESET_PASSWORD_URL,
+  CERTIFICATE_BASE_URL,
 } from '@/lib/config/site-config';
 // Navigation items structure
 export interface NavigationItem {
@@ -114,14 +117,19 @@ export const userMenuItems: NavigationItem[] = [
   {
     label: 'Update Profile',
     icon: <AccountCircleIcon />,
-    href: '#',
+    href: UPDATE_PROFILE_URL,
     type: 'link',
   },
-  { label: 'Reset Password', icon: <SettingsIcon />, href: '#', type: 'link' },
+  {
+    label: 'Reset Password',
+    icon: <SettingsIcon />,
+    href: RESET_PASSWORD_URL,
+    type: 'link'
+  },
   {
     label: 'Obtain Certificate',
     icon: <PublishIcon />,
-    href: '#',
+    href: CERTIFICATE_BASE_URL, // Will be dynamically overridden in AppBar
     type: 'link',
   },
   {

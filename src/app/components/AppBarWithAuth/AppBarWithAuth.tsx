@@ -19,13 +19,16 @@ import {
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { CircularProgress } from '@mui/material';
-
-const RESET_PASSWORD_URL =
-  'https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/resetPassword.html';
-const UPDATE_PROFILE_URL =
-  'https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/profile.html';
-const OBTAIN_CERTIFICATE_URL =
-  'https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/auth/certificate.html';
+import {
+  UPDATE_PROFILE_URL,
+  RESET_PASSWORD_URL,
+  getCertificateUrl,
+} from '@/lib/config/site-config';
+import {
+  saveCredentials,
+  getCredentials,
+  removeCredentials,
+} from '@/lib/auth/token-storage';
 
 interface AppBarWithAuthProps extends Omit<AppBarProps, 'menuLabel' | 'menuItems'> {
   /**
@@ -87,6 +90,8 @@ export function AppBarWithAuth({
         },
         {
           onSuccess: () => {
+            // Save credentials for certificate generation
+            saveCredentials(credentials.username, credentials.password);
             handleCloseLogin();
           },
         }
@@ -96,6 +101,8 @@ export function AppBarWithAuth({
   );
 
   const handleLogout = useCallback(() => {
+    // Remove stored credentials
+    removeCredentials();
     logout(undefined, {
       onSuccess: () => {
         // Clear URL query parameters and add showLogin flag
@@ -116,7 +123,18 @@ export function AppBarWithAuth({
   }, []);
 
   const handleObtainCertificate = useCallback(() => {
-    window.open(OBTAIN_CERTIFICATE_URL, '_blank', 'noopener,noreferrer');
+    // Get stored credentials for HTTP Basic Auth
+    const credentials = getCredentials();
+
+    if (credentials) {
+      // Generate certificate URL with HTTP Basic Auth credentials
+      const certificateUrl = getCertificateUrl(credentials.username, credentials.password);
+      window.open(certificateUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      // Fallback: if credentials not available, prompt user to re-login
+      console.warn('No stored credentials found. Please log in again.');
+      alert('Please log in again to obtain a certificate.');
+    }
   }, []);
 
   const isAuthenticated = authStatus?.authenticated ?? false;
