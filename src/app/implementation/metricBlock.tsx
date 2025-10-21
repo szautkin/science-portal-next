@@ -19,21 +19,15 @@ export const MetricBlockImpl: React.FC<MetricBlockProps> = React.memo(
     const displayTitle = useMemo(() => {
       // Format based on label type
       if (label === 'CPU') {
-        return `Available CPUs: ${series.used.toFixed(1)} / ${max.toFixed(1)}`;
+        return `Available CPUs: ${series.free} / ${max}`;
       } else if (label === 'RAM') {
-        // Convert to GB if the value is in MB (assuming values > 1000 are in MB)
-        const usedDisplay =
-          max > 1000
-            ? `${(series.used / 1024).toFixed(2)}GB`
-            : `${series.used}GB`;
-        const maxDisplay =
-          max > 1000 ? `${(max / 1024).toFixed(2)}GB` : `${max}GB`;
-        return `Available RAM: ${usedDisplay} / ${maxDisplay}`;
+        // Values are already in GB from the API
+        return `Available RAM: ${series.free}GB / ${max}GB`;
       } else {
-        // Instances - show as integers
-        return `Running Instances: ${Math.round(series.used)}`;
+        // Instances - show total
+        return `Running Instances: ${Math.round(max)}`;
       }
-    }, [series.used, max, label]);
+    }, [series.used, series.free, max, label]);
 
     // Define colors based on metric type
     const chartColors = useMemo(() => {

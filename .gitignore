@@ -28,6 +28,12 @@ pnpm-debug.log*
 # Local env files
 .env*.local
 .env
+.env.production
+
+# Sensitive Kubernetes files
+k8s-secrets.yaml
+secrets/
+.secrets
 
 # Vercel
 .vercel

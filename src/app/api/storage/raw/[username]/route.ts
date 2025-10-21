@@ -66,7 +66,8 @@ export const GET = withErrorHandling(async (
   const authHeaders = await forwardAuthHeader(request);
   // Use mode-aware storage API (SRC Cavern for OIDC, CANFAR for CANFAR mode)
   const storageBaseUrl = serverApiConfig.storage.baseUrl;
-  const storageUrl = `${storageBaseUrl}/nodes/home/${username}`;
+  // Base URL already includes /nodes/home/, just append username
+  const storageUrl = `${storageBaseUrl}${username}`;
 
   console.log('[Storage API] Fetching storage data:', {
     username,
