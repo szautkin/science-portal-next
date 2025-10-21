@@ -4,6 +4,7 @@
  * Provides hooks for fetching, creating, and managing Skaha sessions.
  */
 
+import { useEffect, useRef, useCallback } from 'react';
 import {
   useQuery,
   useMutation,
@@ -145,14 +146,15 @@ export function useLaunchSession(
   return useMutation({
     ...restOptions,
     mutationFn: launchSession,
-    onSuccess: (...args) => {
-      // Call user's onSuccess callback if provided
-      userOnSuccess?.(...args);
+    onSuccess: (newSession, variables, ...rest) => {
+      // Optimistically add the new pending session to the list
+      const currentSessions = queryClient.getQueryData<Session[]>(sessionKeys.list()) || [];
+      const updatedSessions = [...currentSessions, newSession];
+      queryClient.setQueryData(sessionKeys.list(), updatedSessions);
 
-      // Wait 30 seconds before refetching to allow backend to create session
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
-      }, 30000);
+      // Call user's onSuccess callback with the new session
+      // The callback will handle starting the polling
+      userOnSuccess?.(newSession, variables, ...rest);
     },
   });
 }
@@ -174,17 +176,29 @@ export function useDeleteSession(options?: UseMutationOptions<void, Error, strin
   return useMutation({
     ...restOptions,
     mutationFn: deleteSession,
-    onSuccess: (data, sessionId, ...rest) => {
+    onSuccess: async (data, sessionId, ...rest) => {
       // Call user's onSuccess callback if provided
       userOnSuccess?.(data, sessionId, ...rest);
 
-      // Wait 30 seconds before refetching to allow backend to process deletion
-      setTimeout(() => {
-        // Invalidate sessions list
-        queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
-        // Remove the specific session from cache
-        queryClient.removeQueries({ queryKey: sessionKeys.detail(sessionId) });
-      }, 30000);
+      // Wait 3 seconds before verifying deletion
+      setTimeout(async () => {
+        try {
+          // Try to fetch the session to verify it's deleted
+          await getSession(sessionId);
+
+          // If we get here, session still exists - invalidate to refetch all
+          queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+        } catch (error) {
+          // Session not found (404) - it's been deleted successfully
+          // Remove the session from the list
+          const currentSessions = queryClient.getQueryData<Session[]>(sessionKeys.list()) || [];
+          const updatedSessions = currentSessions.filter((s) => s.id !== sessionId);
+          queryClient.setQueryData(sessionKeys.list(), updatedSessions);
+
+          // Remove the specific session from cache
+          queryClient.removeQueries({ queryKey: sessionKeys.detail(sessionId) });
+        }
+      }, 3000);
     },
   });
 }
@@ -209,16 +223,115 @@ export function useRenewSession(
     ...restOptions,
     mutationFn: ({ sessionId, hours }) => renewSession(sessionId, hours),
     onSuccess: (updatedSession, variables, ...rest) => {
+      // Immediately update the session in the list with the new expiry time
+      const currentSessions = queryClient.getQueryData<Session[]>(sessionKeys.list()) || [];
+      const updatedSessions = currentSessions.map((session) =>
+        session.id === updatedSession.id
+          ? { ...session, expiresTime: updatedSession.expiresTime }
+          : session
+      );
+      queryClient.setQueryData(sessionKeys.list(), updatedSessions);
+
+      // Update the specific session in cache
+      queryClient.setQueryData(sessionKeys.detail(updatedSession.id), updatedSession);
+
       // Call user's onSuccess callback if provided
       userOnSuccess?.(updatedSession, variables, ...rest);
-
-      // Wait 30 seconds before refetching to allow backend to process renewal
-      setTimeout(() => {
-        // Update the specific session in cache
-        queryClient.setQueryData(sessionKeys.detail(updatedSession.id), updatedSession);
-        // Invalidate sessions list to show updated expiry
-        queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
-      }, 30000);
     },
   });
+}
+
+/**
+ * Poll a specific session until its status changes to Running or Failed
+ * Used after launching a new session
+ *
+ * @example
+ * ```tsx
+ * const { startPolling, stopPolling } = useSessionPolling('session-123', {
+ *   onStatusChange: (session) => console.log('Status changed:', session.status),
+ *   onComplete: () => console.log('Polling complete'),
+ * });
+ *
+ * startPolling();
+ * ```
+ */
+export function useSessionPolling(
+  sessionId: string | null,
+  options?: {
+    interval?: number;
+    onStatusChange?: (session: Session) => void;
+    onComplete?: () => void;
+    onError?: (error: Error) => void;
+  }
+) {
+  const queryClient = useQueryClient();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { interval = 30000, onStatusChange, onComplete, onError } = options || {};
+
+  // Memoize callbacks to prevent recreating on every render
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+    onCompleteRef.current = onComplete;
+    onErrorRef.current = onError;
+  }, [onStatusChange, onComplete, onError]);
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const pollSession = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      const session = await getSession(sessionId);
+
+      // Update the session in the list
+      const currentSessions = queryClient.getQueryData<Session[]>(sessionKeys.list()) || [];
+      const updatedSessions = currentSessions.map((s) =>
+        s.id === sessionId ? session : s
+      );
+      queryClient.setQueryData(sessionKeys.list(), updatedSessions);
+
+      // Notify callback
+      onStatusChangeRef.current?.(session);
+
+      // Stop polling if status is Running or Failed
+      if (session.status === 'Running' || session.status === 'Failed') {
+        stopPolling();
+        onCompleteRef.current?.();
+      }
+    } catch (error) {
+      console.error('Error polling session:', error);
+      onErrorRef.current?.(error as Error);
+
+      // On error, fall back to full sessions refetch
+      queryClient.invalidateQueries({ queryKey: sessionKeys.list() });
+      stopPolling();
+    }
+  }, [sessionId, queryClient, stopPolling]);
+
+  const startPolling = useCallback(() => {
+    if (!sessionId) return;
+
+    // Wait 30 seconds before first poll (session needs time to start)
+    // Then poll at regular intervals
+    intervalRef.current = setInterval(pollSession, interval);
+  }, [sessionId, pollSession, interval]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling]);
+
+  return { startPolling, stopPolling };
 }

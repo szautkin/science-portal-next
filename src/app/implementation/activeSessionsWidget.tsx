@@ -20,6 +20,8 @@ import { SessionCheckModal } from '@/app/components/SessionCheckModal/SessionChe
 
 export function ActiveSessionsWidgetImpl({
   sessions = [],
+  operatingSessionIds = new Set(),
+  pollingSessionId = null,
   isLoading = false,
   onRefresh,
   title = 'Active Sessions',
@@ -240,6 +242,10 @@ export function ActiveSessionsWidgetImpl({
               <SessionCard
                 key={session.sessionName || `session-${index}`}
                 {...session}
+                isOperating={
+                  !!(session.id && operatingSessionIds.has(session.id)) ||
+                  !!(session.id && pollingSessionId === session.id && session.status === 'Pending' && !session.connectUrl)
+                }
                 disableHover={true}
                 sx={{
                   maxWidth: responsiveCardMaxWidth,
@@ -291,6 +297,10 @@ export function ActiveSessionsWidgetImpl({
                 <SessionCard
                   key={session.sessionName || `session-${index}`}
                   {...session}
+                  isOperating={
+                    !!(session.id && operatingSessionIds.has(session.id)) ||
+                    !!(session.id && pollingSessionId === session.id && session.status === 'Pending' && !session.connectUrl)
+                  }
                   disableHover={true}
                   sx={{
                     minWidth: responsiveMinWidth, // Smaller min width on mobile

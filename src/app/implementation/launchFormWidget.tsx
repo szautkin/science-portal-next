@@ -30,6 +30,7 @@ export function LaunchFormWidgetImpl({
   imagesByType = {},
   repositoryHosts = [],
   activeSessions = [],
+  launchSessionFn,
   ...sessionLaunchFormProps
 }: LaunchFormWidgetProps) {
   const theme = useTheme();
@@ -51,21 +52,24 @@ export function LaunchFormWidgetImpl({
       setLaunchedSession(null);
 
       try {
-        // Import launchSession from skaha API
-        const { launchSession } = await import('@/lib/api/skaha');
-
         // Determine which image to use
         const imageToUse = formData.image
           ? `${formData.repositoryHost}/${formData.image}`
           : formData.containerImage;
 
         // Build launch parameters
+        // Only include cores, ram, and gpus if resourceType is 'fixed' (not flexible)
         const launchParams = {
           sessionType: formData.type,
           sessionName: formData.sessionName,
           containerImage: imageToUse,
-          cores: formData.cores,
-          ram: formData.memory,
+          // Only include cores and ram for fixed resources
+          ...(formData.resourceType === 'fixed' && {
+            cores: formData.cores,
+            ram: formData.memory,
+            // Only include gpus if > 0 (API doesn't accept 0)
+            ...(formData.gpus && formData.gpus > 0 && { gpus: formData.gpus }),
+          }),
           // Include registry auth if provided (for Advanced tab with custom images)
           ...(formData.repositoryAuthUsername && formData.repositoryAuthSecret && {
             registryUsername: formData.repositoryAuthUsername,
@@ -73,8 +77,15 @@ export function LaunchFormWidgetImpl({
           }),
         };
 
-        // Launch the session and get the session ID
-        const initialSession = await launchSession(launchParams);
+        // Launch the session using custom function if provided, otherwise use default API
+        let initialSession;
+        if (launchSessionFn) {
+          initialSession = await launchSessionFn(launchParams);
+        } else {
+          // Fallback to default API call
+          const { launchSession } = await import('@/lib/api/skaha');
+          initialSession = await launchSession(launchParams);
+        }
 
         // Call the original onLaunch if provided
         if (sessionLaunchFormProps.onLaunch) {

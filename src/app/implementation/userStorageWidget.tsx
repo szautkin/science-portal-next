@@ -468,12 +468,17 @@ export const UserStorageWidgetImpl = React.forwardRef<
               color: theme.palette.text.secondary,
             }}
           >
-            <Typography variant="caption">
+            <Typography variant="caption" sx={{ fontSize: '10px' }}>
               Last update:{' '}
               <Typography
                 component="span"
                 variant="caption"
-                color="text.primary"
+                sx={{
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  fontFamily: 'monospace',
+                  color: 'primary.500',
+                }}
               >
                 {lastUpdate}
               </Typography>

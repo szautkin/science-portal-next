@@ -12,6 +12,8 @@ export interface SessionFormData {
   sessionName: string;
   memory: number;
   cores: number;
+  gpus?: number; // GPU cores (optional)
+  resourceType?: 'flexible' | 'fixed'; // Track if resources are flexible or fixed
   // Advanced tab fields
   repositoryHost?: string;
   image?: string;
@@ -34,6 +36,7 @@ export interface SessionLaunchFormProps {
   repositoryHosts?: string[];
   memoryOptions?: number[];
   coreOptions?: number[];
+  gpuOptions?: number[];
   defaultValues?: Partial<SessionFormData>;
   isLoading?: boolean;
   errorMessage?: string | null;

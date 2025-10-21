@@ -11,8 +11,10 @@ import {
 import {
   getContainerImages,
   getImageRepositories,
+  getContext,
   type ImagesByTypeAndProject,
   type ImageRepository,
+  type ContextResponse,
 } from '@/lib/api/skaha';
 
 /**
@@ -23,6 +25,7 @@ export const imageKeys = {
   lists: () => [...imageKeys.all, 'list'] as const,
   list: () => [...imageKeys.lists()] as const,
   repositories: () => [...imageKeys.all, 'repositories'] as const,
+  context: () => [...imageKeys.all, 'context'] as const,
 };
 
 /**
@@ -79,6 +82,32 @@ export function useImageRepositories(
     enabled: isAuthenticated !== false,
     // Cache repository hosts for 10 minutes since they rarely change
     staleTime: 10 * 60 * 1000,
+    ...options,
+  });
+}
+
+/**
+ * Get context information (available CPU cores and RAM for the user)
+ *
+ * @param isAuthenticated - Whether the user is authenticated (optional, defaults to true for backward compatibility)
+ * @example
+ * ```tsx
+ * const { data: authStatus } = useAuthStatus();
+ * const { data: context, isLoading } = useContext(authStatus?.authenticated);
+ * // context contains: { availableCores, availableRAM, defaultCores, defaultRAM }
+ * ```
+ */
+export function useContext(
+  isAuthenticated?: boolean,
+  options?: Omit<UseQueryOptions<ContextResponse>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: imageKeys.context(),
+    queryFn: getContext,
+    // Only fetch if authenticated (default to true for backward compatibility)
+    enabled: isAuthenticated !== false,
+    // Cache context for 5 minutes since it may change based on system load
+    staleTime: 5 * 60 * 1000,
     ...options,
   });
 }

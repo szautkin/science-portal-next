@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect, Suspense } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
@@ -15,12 +15,25 @@ import { appBarWithUserMenu, CanfarLogo, SRCNetLogo } from '@/stories/shared/nav
 import type { SessionCardProps } from '@/app/types/SessionCardProps';
 import type { PlatformLoadData } from '@/app/types/PlatformLoadProps';
 import { useAuthStatus } from '@/lib/hooks/useAuth';
-import { useSessions, useDeleteSession, useRenewSession } from '@/lib/hooks/useSessions';
+import { useSessions, useDeleteSession, useRenewSession, useLaunchSession, useSessionPolling } from '@/lib/hooks/useSessions';
 import { usePlatformLoad } from '@/lib/hooks/usePlatformLoad';
-import { useContainerImages, useImageRepositories } from '@/lib/hooks/useImages';
+import { useContainerImages, useImageRepositories, useContext } from '@/lib/hooks/useImages';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Session } from '@/lib/api/skaha';
+import type { Session, SessionLaunchParams } from '@/lib/api/skaha';
 import { saveToken, hasToken } from '@/lib/auth/token-storage';
+import {
+  DOCS_URL,
+  ABOUT_URL,
+  OPEN_SOURCE_URL,
+  SUPPORT_EMAIL,
+  DISCORD_URL,
+  STORAGE_MANAGEMENT_URL,
+  GROUP_MANAGEMENT_URL,
+  DATA_PUBLICATION_URL,
+  SCIENCE_PORTAL_URL,
+  CADC_SEARCH_URL,
+  OPENSTACK_CLOUD_URL,
+} from '@/lib/config/site-config';
 
 export default function SciencePortalPage() {
   // Check if in OIDC mode
@@ -54,6 +67,12 @@ export default function SciencePortalPage() {
 
   // Track previous auth state to detect logout
   const [prevAuthState, setPrevAuthState] = useState(isAuthenticated);
+
+  // Track which sessions are currently being operated on (delete/renew)
+  const [operatingSessionIds, setOperatingSessionIds] = useState<Set<string>>(new Set());
+
+  // Track which sessions are being polled after launch
+  const [pollingSessionId, setPollingSessionId] = useState<string | null>(null);
 
   // Detect logout and trigger page reload to reset everything
   useEffect(() => {
@@ -116,34 +135,139 @@ export default function SciencePortalPage() {
     refetch: refetchRepositories
   } = useImageRepositories(isAuthenticated);
 
+  // Fetch context (available cores, RAM, GPU options)
+  const {
+    data: context,
+    isLoading: isLoadingContext,
+    isFetching: isFetchingContext,
+    refetch: refetchContext
+  } = useContext(isAuthenticated);
+
+  // Debug: Log context state
+  useEffect(() => {
+    console.log('🔍 Context Hook State:', {
+      isAuthenticated,
+      isLoadingContext,
+      isFetchingContext,
+      hasData: !!context,
+      context
+    });
+  }, [isAuthenticated, isLoadingContext, isFetchingContext, context]);
+
   // Mutation hooks for session actions
   const { mutate: deleteSession } = useDeleteSession({
-    onSuccess: () => {
+    onSuccess: (_, sessionId) => {
       console.log('Session deleted successfully');
+      // Keep operating state for 3 seconds while verification happens
+      setTimeout(() => {
+        setOperatingSessionIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sessionId);
+          return next;
+        });
+      }, 3500); // Slightly longer than the 3s verification delay
     },
-    onError: (error) => {
+    onError: (error, sessionId) => {
       console.error('Failed to delete session:', error);
+      // Remove operating state on error
+      setOperatingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
     },
   });
 
   const { mutate: renewSession } = useRenewSession({
-    onSuccess: () => {
+    onSuccess: (_, { sessionId }) => {
       console.log('Session renewed successfully');
+      // Remove operating state immediately since we trust the API response
+      setOperatingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
     },
-    onError: (error) => {
+    onError: (error, { sessionId }) => {
       console.error('Failed to renew session:', error);
+      // Remove operating state on error
+      setOperatingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
     },
   });
+
+  const { mutateAsync: launchSessionAsync } = useLaunchSession({
+    onSuccess: (newSession) => {
+      console.log('Session launched successfully:', newSession.id);
+      // Start polling this session
+      setPollingSessionId(newSession.id);
+    },
+    onError: (error) => {
+      console.error('Failed to launch session:', error);
+    },
+  });
+
+  // Wrap the mutation in a function that can be passed to LaunchFormWidget
+  const handleLaunchSession = useCallback(
+    async (params: SessionLaunchParams): Promise<Session> => {
+      return await launchSessionAsync(params);
+    },
+    [launchSessionAsync]
+  );
+
+  // Session polling hook for newly launched sessions
+  const { startPolling, stopPolling } = useSessionPolling(pollingSessionId, {
+    interval: 30000, // Poll every 30 seconds
+    onStatusChange: (session) => {
+      console.log('Session status changed:', session.status);
+    },
+    onComplete: () => {
+      console.log('Session polling complete');
+      setPollingSessionId(null);
+    },
+    onError: (error) => {
+      console.error('Error polling session:', error);
+      setPollingSessionId(null);
+    },
+  });
+
+  // Start polling when pollingSessionId changes
+  useEffect(() => {
+    if (pollingSessionId) {
+      startPolling();
+    }
+    return () => {
+      stopPolling();
+    };
+  }, [pollingSessionId, startPolling, stopPolling]);
 
   // LOADING LOGIC - ALL IN ONE PLACE:
   // NOT authenticated → ALWAYS show loading
   // IS authenticated → show loading while initial loading OR refetching (after 30s delay from mutations)
   const isLoadingSessions = !isAuthenticated || isLoading || isFetching;
   const isLoadingPlatform = !isAuthenticated || isPlatformLoading || isPlatformFetching;
-  const isLoadingLaunchForm = !isAuthenticated || isLoadingImages || isLoadingRepositories || isFetchingImages || isFetchingRepositories;
+  const isLoadingLaunchForm = !isAuthenticated || isLoadingImages || isLoadingRepositories || isLoadingContext || isFetchingImages || isFetchingRepositories || isFetchingContext;
   const isLoadingUserStorage = !isAuthenticated;
 
+  // Create stable handlers using useCallback
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    // Add to operating set
+    setOperatingSessionIds((prev) => new Set(prev).add(sessionId));
+    deleteSession(sessionId);
+  }, [deleteSession]);
+
+  const handleRenewSession = useCallback((sessionId: string) => {
+    // Add to operating set
+    setOperatingSessionIds((prev) => new Set(prev).add(sessionId));
+    // Default to 12 hours extension - this will be customizable via modal
+    renewSession({ sessionId, hours: 12 });
+  }, [renewSession]);
+
   // Transform Session data to SessionCardProps format with action handlers
+  // NOTE: We do NOT include isOperating here - it's passed separately to avoid recreating the array
   const activeSessions: SessionCardProps[] = useMemo(() => {
     return sessions.map((session: Session) => ({
       id: session.id,
@@ -158,22 +282,16 @@ export default function SciencePortalPage() {
       memoryAllocated: session.memoryAllocated,
       cpuUsage: session.cpuUsage,
       cpuAllocated: session.cpuAllocated,
+      gpuAllocated: session.gpuAllocated,
+      isFixedResources: session.isFixedResources,
       connectUrl: session.connectUrl,
       requestedRAM: session.requestedRAM,
       requestedCPU: session.requestedCPU,
-      onDelete: () => {
-        if (session.id) {
-          deleteSession(session.id);
-        }
-      },
-      onExtendTime: () => {
-        if (session.id) {
-          // Default to 12 hours extension - this will be customizable via modal
-          renewSession({ sessionId: session.id, hours: 12 });
-        }
-      },
+      requestedGPU: session.requestedGPU,
+      onDelete: () => handleDeleteSession(session.id),
+      onExtendTime: () => handleRenewSession(session.id),
     }));
-  }, [sessions, deleteSession, renewSession]);
+  }, [sessions, handleDeleteSession, handleRenewSession]);
 
   // Handle refresh for ActiveSessionsWidget
   const handleSessionsRefresh = useCallback(() => {
@@ -187,12 +305,13 @@ export default function SciencePortalPage() {
     refetchPlatformLoad();
   }, [refetchPlatformLoad]);
 
-  // Handle refresh for Launch Form (images and repositories)
+  // Handle refresh for Launch Form (images, repositories, and context)
   const handleLaunchFormRefresh = useCallback(() => {
-    // Refetch both images and repositories
+    // Refetch images, repositories, and context
     refetchImages();
     refetchRepositories();
-  }, [refetchImages, refetchRepositories]);
+    refetchContext();
+  }, [refetchImages, refetchRepositories, refetchContext]);
 
   // Provide placeholder data for Platform Load when data is not yet loaded
   const platformLoadDataOrPlaceholder: PlatformLoadData = useMemo(() => {
@@ -213,25 +332,27 @@ export default function SciencePortalPage() {
     {
       title: 'Resources',
       links: [
-        { label: 'Documentation', href: '/docs' },
-        { label: 'API Reference', href: '/docs/api' },
-        { label: 'Tutorials', href: '/docs/tutorials' },
+        { label: 'Documentation', href: DOCS_URL, external: true },
+        { label: 'About', href: ABOUT_URL, external: true },
+        { label: 'Open Source', href: OPEN_SOURCE_URL, external: true },
       ],
     },
     {
-      title: 'Community',
+      title: 'Services',
       links: [
-        { label: 'Forum', href: 'https://forum.canfar.net', external: true },
-        { label: 'GitHub', href: 'https://github.com/canfar', external: true },
-        { label: 'Slack', href: '/community/slack' },
+        { label: 'Storage Management', href: STORAGE_MANAGEMENT_URL, external: true },
+        { label: 'Group Management', href: GROUP_MANAGEMENT_URL, external: true },
+        { label: 'Data Publication', href: DATA_PUBLICATION_URL, external: true },
+        { label: 'Science Portal', href: SCIENCE_PORTAL_URL, external: true },
+        { label: 'CADC Search', href: CADC_SEARCH_URL, external: true },
+        { label: 'OpenStack Cloud', href: OPENSTACK_CLOUD_URL, external: true },
       ],
     },
     {
       title: 'Support',
       links: [
-        { label: 'Help Center', href: '/support' },
-        { label: 'Contact Us', href: '/contact' },
-        { label: 'System Status', href: '/status' },
+        { label: 'Help', href: SUPPORT_EMAIL, external: false },
+        { label: 'Join us on Discord', href: DISCORD_URL, external: true },
       ],
     },
   ];
@@ -278,6 +399,8 @@ export default function SciencePortalPage() {
             >
               <ActiveSessionsWidget
                 sessions={activeSessions}
+                operatingSessionIds={operatingSessionIds}
+                pollingSessionId={pollingSessionId}
                 layout="responsive"
                 isLoading={isLoadingSessions}
                 onRefresh={handleSessionsRefresh}
@@ -317,16 +440,18 @@ export default function SciencePortalPage() {
                 minWidth: 0, // Prevent flex item from overflowing
               }}
             >
-              <Suspense fallback={<Box sx={{ p: 3 }}>Loading...</Box>}>
-                <LaunchFormWidget
-                  helpUrl="https://www.opencadc.org/science-containers/"
-                  imagesByType={imagesByType}
-                  repositoryHosts={imageRepositories.map(repo => repo.host).filter((host): host is string => Boolean(host))}
-                  isLoading={isLoadingLaunchForm}
-                  onRefresh={handleLaunchFormRefresh}
-                  activeSessions={sessions}
-                />
-              </Suspense>
+              <LaunchFormWidget
+                helpUrl="https://www.opencadc.org/science-containers/"
+                imagesByType={imagesByType}
+                repositoryHosts={imageRepositories.map(repo => repo.host).filter((host): host is string => Boolean(host))}
+                isLoading={isLoadingLaunchForm}
+                onRefresh={handleLaunchFormRefresh}
+                activeSessions={sessions}
+                launchSessionFn={handleLaunchSession}
+                coreOptions={context?.cores.options}
+                memoryOptions={context?.memoryGB.options}
+                gpuOptions={context?.gpus.options}
+              />
             </Box>
 
             {/* PlatformLoad - 40% width on large screens */}
@@ -347,11 +472,13 @@ export default function SciencePortalPage() {
         </Container>
       </Box>
 
-      {/* Footer - full width */}
-      <Footer
-        sections={footerSections}
-        copyright="© 2024 CANFAR. All rights reserved."
-      />
+      {/* Footer - full width - CANFAR mode only */}
+      {!isOIDCMode && (
+        <Footer
+          sections={footerSections}
+          copyright="© 2022-2025"
+        />
+      )}
     </Box>
   );
 }

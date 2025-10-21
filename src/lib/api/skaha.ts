@@ -27,7 +27,7 @@ export interface SkahaSessionResponse {
   expiryTime: string;
   connectURL: string;
   requestedRAM?: string;
-  requestedCPU?: string;
+  requestedCPUCores?: string; // Note: API uses "requestedCPUCores" not "requestedCPU"
   requestedGPUCores?: string;
   ramInUse?: string;
   cpuCoresInUse?: string;
@@ -48,9 +48,12 @@ export interface Session {
   memoryAllocated: string;
   cpuUsage?: string;
   cpuAllocated: string;
+  gpuAllocated?: string;
+  isFixedResources?: boolean;
   connectUrl?: string;
   requestedRAM?: string;
   requestedCPU?: string;
+  requestedGPU?: string;
 }
 
 // SKAHA Stats API Response - raw format from /v1/session?view=stats
@@ -119,12 +122,33 @@ export interface ImageRepository {
   [key: string]: string | undefined;
 }
 
+export interface ContextResponse {
+  cores: {
+    default: number;
+    defaultRequest: number;
+    defaultLimit: number;
+    defaultHeadless: number;
+    options: number[];
+  };
+  memoryGB: {
+    default: number;
+    defaultRequest: number;
+    defaultLimit: number;
+    defaultHeadless: number;
+    options: number[];
+  };
+  gpus: {
+    options: number[];
+  };
+}
+
 export interface SessionLaunchParams {
   sessionType: SessionType;
   sessionName: string;
   containerImage: string;
-  cores: number;
-  ram: number;
+  cores?: number; // Optional - only for fixed resources
+  ram?: number; // Optional - only for fixed resources
+  gpus?: number; // Optional - only for fixed resources
   env?: Record<string, string>;
   cmd?: string;
   // Registry authentication for private/unknown images (Advanced tab)
@@ -148,10 +172,13 @@ function transformSkahaSession(skahaSession: SkahaSessionResponse): Session {
     memoryUsage: skahaSession.ramInUse,
     memoryAllocated: skahaSession.requestedRAM || 'N/A',
     cpuUsage: skahaSession.cpuCoresInUse,
-    cpuAllocated: skahaSession.requestedCPU || 'N/A',
+    cpuAllocated: skahaSession.requestedCPUCores || 'N/A',
+    gpuAllocated: skahaSession.requestedGPUCores || '0',
+    isFixedResources: skahaSession.isFixedResources,
     connectUrl: skahaSession.connectURL,
     requestedRAM: skahaSession.requestedRAM,
-    requestedCPU: skahaSession.requestedCPU,
+    requestedCPU: skahaSession.requestedCPUCores,
+    requestedGPU: skahaSession.requestedGPUCores,
   };
 }
 
@@ -189,7 +216,8 @@ export async function getSession(sessionId: string): Promise<Session> {
     throw new Error(`Failed to fetch session ${sessionId}: ${response.status}`);
   }
 
-  return response.json();
+  const skahaResponse: SkahaSessionResponse = await response.json();
+  return transformSkahaSession(skahaResponse);
 }
 
 /**
@@ -229,21 +257,22 @@ export async function launchSession(params: SessionLaunchParams): Promise<Sessio
 
   const result = await response.json();
 
-  // Return basic session info immediately
-  // The hook will trigger a refetch after 30 seconds to get full details
+  // Return MINIMAL session info with only what API gave us
+  // Polling will fetch full details after 30 seconds
   if (result.sessionId || result.id) {
     const sessionId = (result.sessionId || result.id).trim(); // Remove any whitespace/newlines
     return {
       id: sessionId,
       sessionId: sessionId,
       sessionType: params.sessionType,
-      sessionName: params.sessionName,
+      sessionName: result.sessionName || params.sessionName,
       status: 'Pending' as SessionStatus,
-      containerImage: params.containerImage,
-      startedTime: new Date().toISOString(),
+      // Leave everything else empty - will be populated by polling
+      containerImage: '',
+      startedTime: '',
       expiresTime: '',
-      memoryAllocated: `${params.ram}G`,
-      cpuAllocated: `${params.cores}`,
+      memoryAllocated: '',
+      cpuAllocated: '',
       connectUrl: undefined,
     };
   }
@@ -316,6 +345,24 @@ export async function getImageRepositories(): Promise<ImageRepository[]> {
 
   if (!response.ok) {
     throw new Error(`Failed to fetch image repositories: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get context information (available CPU cores and RAM for the user)
+ */
+export async function getContext(): Promise<ContextResponse> {
+  const authHeaders = getAuthHeader();
+  const response = await fetch('/api/sessions/context', {
+    method: 'GET',
+    headers: { 'Accept': 'application/json', ...authHeaders },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch context: ${response.status}`);
   }
 
   return response.json();

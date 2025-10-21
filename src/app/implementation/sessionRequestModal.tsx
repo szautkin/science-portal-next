@@ -28,25 +28,42 @@ import { SessionRequestModalProps } from '../types/SessionRequestModalProps';
 const parseErrorMessage = (error: string | undefined): string => {
   if (!error) return 'An unknown error occurred';
 
+  let errorText = error;
+
+  // Try to parse as JSON first
+  try {
+    const errorObj = JSON.parse(error);
+    // Extract message field if it exists
+    if (errorObj.message) {
+      errorText = errorObj.message;
+    } else if (errorObj.details) {
+      errorText = errorObj.details;
+    } else if (errorObj.error) {
+      errorText = errorObj.error;
+    }
+  } catch (e) {
+    // Not JSON, continue with string parsing
+  }
+
   // Match: "User X has reached the maximum of N active sessions."
-  const maxSessionsMatch = error.match(/reached the maximum of (\d+) active sessions/i);
+  const maxSessionsMatch = errorText.match(/reached the maximum of (\d+) active sessions/i);
   if (maxSessionsMatch) {
     const maxSessions = maxSessionsMatch[1];
     return `You have reached the maximum limit of ${maxSessions} active sessions. Please delete an existing session before creating a new one.`;
   }
 
   // Match: "insufficient resources" or similar
-  if (error.match(/insufficient|not enough|unavailable/i)) {
+  if (errorText.match(/insufficient|not enough|unavailable/i)) {
     return 'Insufficient resources available. Please try again later or request fewer resources.';
   }
 
   // Match: "quota exceeded"
-  if (error.match(/quota.*exceeded/i)) {
+  if (errorText.match(/quota.*exceeded/i)) {
     return 'Resource quota exceeded. Please delete unused sessions or contact support.';
   }
 
   // Default: return the original error, cleaned up
-  return error.trim();
+  return errorText.trim();
 };
 
 /**

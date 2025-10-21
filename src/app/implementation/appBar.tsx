@@ -671,6 +671,10 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
                                   <MenuItem
                                     key={`item-${menuIndex}`}
                                     icon={menuItem.icon}
+                                    component={menuItem.href ? 'a' : undefined}
+                                    href={menuItem.href}
+                                    target={menuItem.href?.startsWith('http') ? '_blank' : undefined}
+                                    rel={menuItem.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
                                     onClick={() =>
                                       handleLinkMenuItemClick(
                                         index,
@@ -726,8 +730,7 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
             )}
 
             {/* Right Zone - Account Actions */}
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {accountButton}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               {!isMobile && menuItems.length > 0 && (
                 <>
                   <Box
@@ -810,6 +813,10 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
                         <MenuItem
                           key={`item-${index}`}
                           icon={item.icon}
+                          component={item.href ? 'a' : undefined}
+                          href={item.href}
+                          target={item.href?.startsWith('http') ? '_blank' : undefined}
+                          rel={item.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
                           onClick={() => handleMenuItemClick(item.onClick)}
                         >
                           {item.label}
@@ -820,6 +827,18 @@ export const AppBarImpl = React.forwardRef<HTMLDivElement, AppBarProps>(
                   </Menu>
                 </>
               )}
+              {!isMobile && menuItems.length > 0 && accountButton && (
+                <Divider
+                  orientation="vertical"
+                  flexItem
+                  sx={{
+                    height: '32px',
+                    alignSelf: 'center',
+                    mx: 1,
+                  }}
+                />
+              )}
+              {accountButton}
             </Box>
           </Toolbar>
         </MuiAppBar>

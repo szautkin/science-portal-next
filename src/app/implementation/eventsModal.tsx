@@ -42,6 +42,7 @@ import type {
   EventReason,
   UseSessionEventsReturn,
 } from '@/app/types/EventsModalProps';
+import { getAuthHeader } from '@/lib/auth/token-storage';
 
 /**
  * Parse raw log data into structured events
@@ -172,7 +173,14 @@ const useSessionEvents = (
       const endpoint =
         eventsEndpoint || `/api/sessions/${sessionId}/logs`;
 
+      const authHeaders = getAuthHeader();
+
       const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/plain',
+          ...authHeaders,
+        },
         credentials: 'include',
       });
 

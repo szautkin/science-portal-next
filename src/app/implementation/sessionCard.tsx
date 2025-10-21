@@ -11,6 +11,8 @@ import {
   Skeleton,
   Stack,
   Tooltip,
+  CircularProgress,
+  Backdrop,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -18,8 +20,6 @@ import {
   Description as LogsIcon,
   Schedule as ExtendIcon,
   Science as JupyterIcon,
-  Computer as DesktopIcon,
-  StarBorder as CartaIcon,
   Code as CodeIcon,
 } from '@mui/icons-material';
 import {
@@ -31,18 +31,24 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { EventsModal } from '@/app/components/EventsModal/EventsModal';
 import { DeleteSessionModal } from '@/app/components/DeleteSessionModal/DeleteSessionModal';
 import { SessionRenewModal } from '@/app/components/SessionRenewModal/SessionRenewModal';
-import type { SessionEvent } from '@/app/types/EventsModalProps';
 
 const getSessionIcon = (type: SessionType): React.ReactNode => {
+  const iconSize = 24; // Standard icon size
+  const iconStyle = { width: iconSize, height: iconSize, objectFit: 'contain' as const };
+
   switch (type) {
     case 'notebook':
     case 'contributednotebook':
-      return <JupyterIcon />;
+        return <img src="/notebook_icon.jpg" alt="Desktop" style={iconStyle} />;
     case 'desktop':
     case 'contributeddesktop':
-      return <DesktopIcon />;
+      return <img src="/desktop_icon.png" alt="Desktop" style={iconStyle} />;
     case 'carta':
-      return <CartaIcon />;
+      return <img src="/carta_icon.png" alt="CARTA" style={iconStyle} />;
+    case 'contributed':
+      return <img src="/contributed_icon.png" alt="Contributed" style={iconStyle} />;
+    case 'firefly':
+      return <img src="/firefly_icon.png" alt="Firefly" style={iconStyle} />;
     default:
       return <CodeIcon />;
   }
@@ -70,6 +76,11 @@ const getStatusColor = (
  * Example: "images.canfar.net/skaha/firefly:2025.2" -> "skaha/firefly:2025.2"
  */
 const getShortImageName = (fullImagePath: string): string => {
+  // Handle undefined, null, or empty values
+  if (!fullImagePath) {
+    return 'N/A';
+  }
+
   // Split by "/" and take everything after the first part (registry host)
   const parts = fullImagePath.split('/');
   if (parts.length > 1) {
@@ -85,6 +96,11 @@ const getShortImageName = (fullImagePath: string): string => {
  * Example: "2025-10-17T15:03:29Z" -> "2025-10-17 15:03"
  */
 const formatTimestamp = (timestamp: string): string => {
+  // Handle undefined, null, or empty values
+  if (!timestamp) {
+    return 'Pending...';
+  }
+
   // Remove seconds and 'Z' from ISO timestamp, replace 'T' with space
   // Format: YYYY-MM-DDTHH:MM:SSZ -> YYYY-MM-DD HH:MM
   return timestamp.replace(/:\d{2}Z?\s*$/, '').replace('Z', '').replace('T', ' ');
@@ -107,6 +123,8 @@ export const SessionCardImpl = React.forwardRef<
       memoryAllocated,
       cpuUsage,
       cpuAllocated,
+      gpuAllocated,
+      isFixedResources,
       connectUrl,
       onDelete,
       onShowEvents,
@@ -114,6 +132,7 @@ export const SessionCardImpl = React.forwardRef<
       onExtendTime,
       onClick,
       loading = false,
+      isOperating = false,
       // disableHover = true, // Hover effects removed globally
       ...cardProps
     },
@@ -127,134 +146,14 @@ export const SessionCardImpl = React.forwardRef<
     const [isDeleting, setIsDeleting] = useState(false);
     const [isRenewing, setIsRenewing] = useState(false);
 
-    // Generate mock events based on session status
-    const mockEvents = useMemo<SessionEvent[]>(() => {
-      const baseTime = new Date().toISOString();
-      const events: SessionEvent[] = [];
-
-      // Add events based on status
-      if (status === 'Running' || status === 'Terminating') {
-        events.push(
-          {
-            id: 'event-1',
-            type: 'Normal',
-            reason: 'Scheduled',
-            message: `Successfully assigned ${sessionName} to node`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-2',
-            type: 'Normal',
-            reason: 'Pulling',
-            message: `Pulling image "${containerImage}"`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-3',
-            type: 'Normal',
-            reason: 'Pulled',
-            message: `Successfully pulled image "${containerImage}"`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-4',
-            type: 'Normal',
-            reason: 'Created',
-            message: `Created container ${sessionName}`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-5',
-            type: 'Normal',
-            reason: 'Started',
-            message: `Started container ${sessionName}`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          }
-        );
-      }
-
-      if (status === 'Pending') {
-        events.push(
-          {
-            id: 'event-1',
-            type: 'Normal',
-            reason: 'Scheduled',
-            message: `Successfully assigned ${sessionName} to node`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-2',
-            type: 'Warning',
-            reason: 'Failed',
-            message: `Failed to pull image "${containerImage}": connection timeout`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-3',
-            type: 'Warning',
-            reason: 'BackOff',
-            message: `Back-off pulling image "${containerImage}"`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          }
-        );
-      }
-
-      if (status === 'Failed') {
-        events.push(
-          {
-            id: 'event-1',
-            type: 'Normal',
-            reason: 'Scheduled',
-            message: `Successfully assigned ${sessionName} to node`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-2',
-            type: 'Error',
-            reason: 'Failed',
-            message: `Error: ImagePullBackOff - Container image "${containerImage}" not found`,
-            firstTime: baseTime,
-            lastTime: baseTime,
-          },
-          {
-            id: 'event-3',
-            type: 'Error',
-            reason: 'Unhealthy',
-            message: 'Liveness probe failed: connection refused',
-            firstTime: baseTime,
-            lastTime: baseTime,
-          }
-        );
-      }
-
-      if (status === 'Terminating') {
-        events.push({
-          id: 'event-6',
-          type: 'Normal',
-          reason: 'Killing',
-          message: `Stopping container ${sessionName}`,
-          firstTime: baseTime,
-          lastTime: baseTime,
-        });
-      }
-
-      return events;
-    }, [status, sessionName, containerImage]);
-
     const handleCardClick = () => {
-      if (onClick) {
-        onClick();
-      } else if (connectUrl && status === 'Running') {
-        window.open(connectUrl, '_blank');
+      // Only allow clicking on Running sessions
+      if (status === 'Running') {
+        if (onClick) {
+          onClick();
+        } else if (connectUrl) {
+          window.open(connectUrl, '_blank');
+        }
       }
     };
 
@@ -366,8 +265,26 @@ export const SessionCardImpl = React.forwardRef<
           sx={{
             cursor: status === 'Running' ? 'pointer' : 'default',
             border: `1px solid ${theme.palette.divider}`,
+            position: 'relative',
           }}
         >
+          {/* Operating state overlay */}
+          {isOperating && (
+            <Backdrop
+              open={isOperating}
+              sx={{
+                position: 'absolute',
+                zIndex: theme.zIndex.drawer + 1,
+                backgroundColor: theme.palette.mode === 'dark'
+                  ? 'rgba(0, 0, 0, 0.7)'
+                  : 'rgba(255, 255, 255, 0.7)',
+                borderRadius: theme.shape.borderRadius,
+              }}
+            >
+              <CircularProgress size={40} />
+            </Backdrop>
+          )}
+
           <CardContent
             sx={{
               [theme.breakpoints.down('sm')]: {
@@ -429,6 +346,21 @@ export const SessionCardImpl = React.forwardRef<
                 >
                   {sessionName}
                 </Typography>
+                {/* FLEX badge for flexible resources */}
+                {isFixedResources === false && (
+                  <Chip
+                    label="FLEX"
+                    size="small"
+                    sx={{
+                      height: '20px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      backgroundColor: theme.palette.success.light,
+                      color: theme.palette.success.contrastText,
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
               </Box>
               <Chip
                 label={status}
@@ -592,7 +524,10 @@ export const SessionCardImpl = React.forwardRef<
                       },
                     }}
                   >
-                    {memoryUsage} / {memoryAllocated}
+                    {isFixedResources === false
+                      ? (memoryUsage || 'N/A')
+                      : `${memoryUsage || 'N/A'} / ${memoryAllocated}`
+                    }
                   </Typography>
                 </Box>
                 <Box
@@ -631,7 +566,49 @@ export const SessionCardImpl = React.forwardRef<
                       },
                     }}
                   >
-                    {cpuUsage} / {cpuAllocated}
+                    {isFixedResources === false
+                      ? (cpuUsage || 'N/A')
+                      : `${cpuUsage || 'N/A'} / ${cpuAllocated}`
+                    }
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    minWidth: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    [theme.breakpoints.up('sm')]: {
+                      flexDirection: 'row',
+                      alignItems: 'baseline',
+                    },
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    component="span"
+                    sx={{
+                      flexShrink: 0,
+                      mr: 1,
+                      [theme.breakpoints.down('sm')]: {
+                        fontSize: theme.typography.caption.fontSize,
+                        marginBottom: '2px',
+                      },
+                    }}
+                  >
+                    vGPU:
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    component="span"
+                    sx={{
+                      fontWeight: theme.typography.fontWeightBold,
+                      [theme.breakpoints.down('sm')]: {
+                        fontSize: theme.typography.caption.fontSize,
+                      },
+                    }}
+                  >
+                    {gpuAllocated || '0'}
                   </Typography>
                 </Box>
               </Box>
@@ -702,20 +679,23 @@ export const SessionCardImpl = React.forwardRef<
                   <LogsIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Extend time">
-                <IconButton
-                  size="small"
-                  onClick={handleExtendClick}
-                  aria-label="Extend time"
-                  sx={{
-                    [theme.breakpoints.down('sm')]: {
-                      minWidth: '44px',
-                      minHeight: '44px',
-                    },
-                  }}
-                >
-                  <ExtendIcon fontSize="small" />
-                </IconButton>
+              <Tooltip title={status === 'Pending' ? "Cannot extend a pending session" : "Extend time"}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={handleExtendClick}
+                    aria-label="Extend time"
+                    disabled={status === 'Pending'}
+                    sx={{
+                      [theme.breakpoints.down('sm')]: {
+                        minWidth: '44px',
+                        minHeight: '44px',
+                      },
+                    }}
+                  >
+                    <ExtendIcon fontSize="small" />
+                  </IconButton>
+                </span>
               </Tooltip>
             </Box>
           </CardContent>
@@ -728,7 +708,7 @@ export const SessionCardImpl = React.forwardRef<
           sessionName={sessionName}
           onClose={() => setShowEventsModal(false)}
           showRefreshButton={true}
-          initialEvents={mockEvents}
+          eventsEndpoint={`/api/sessions/${sessionId || sessionName}/events`}
         />
 
         {/* Logs Modal (Raw view only, parsing disabled) */}
@@ -740,8 +720,7 @@ export const SessionCardImpl = React.forwardRef<
           showRefreshButton={true}
           forceRawView={true}
           defaultView="raw"
-          eventsEndpoint={`/science-portal/session/${sessionId || sessionName}?view=logs`}
-          initialEvents={mockEvents}
+          eventsEndpoint={`/api/sessions/${sessionId || sessionName}/logs`}
         />
 
         {/* Delete Confirmation Modal */}

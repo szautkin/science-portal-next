@@ -30,14 +30,18 @@ export interface SessionCardProps extends Omit<CardProps, 'onClick'> {
   memoryAllocated: string; // e.g., "8G"
   cpuUsage?: string; // e.g., "<none>" - optional to match API
   cpuAllocated: string; // e.g., "2"
+  gpuAllocated?: string; // e.g., "0" or "1"
+  isFixedResources?: boolean; // True if resources are fixed, false if flexible
   connectUrl?: string; // optional to match API
   requestedRAM?: string;
   requestedCPU?: string;
+  requestedGPU?: string;
   onDelete?: () => void;
   onShowEvents?: () => void;
   onShowLogs?: () => void;
   onExtendTime?: () => void;
   onClick?: () => void;
-  loading?: boolean;
+  loading?: boolean; // Full skeleton loading state (initial load)
+  isOperating?: boolean; // Overlay spinner during operations (delete/renew)
   disableHover?: boolean;
 }

@@ -2,9 +2,10 @@ import React from 'react';
 import StorageIcon from '@mui/icons-material/Storage';
 import GroupIcon from '@mui/icons-material/Group';
 import PublishIcon from '@mui/icons-material/Publish';
-import ScienceIcon from '@mui/icons-material/Science';
+import LinkIcon from '@mui/icons-material/Link';
+import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import SearchIcon from '@mui/icons-material/Search';
-import CloudIcon from '@mui/icons-material/Cloud';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import HelpIcon from '@mui/icons-material/Help';
 import ChatIcon from '@mui/icons-material/Chat';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -13,6 +14,19 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DocumentationIcon from '@mui/icons-material/Description';
 import InfoIcon from '@mui/icons-material/Info';
 import DiamondIcon from '@mui/icons-material/Diamond';
+import {
+  DOCS_URL,
+  ABOUT_URL,
+  OPEN_SOURCE_URL,
+  SUPPORT_EMAIL,
+  DISCORD_URL,
+  STORAGE_MANAGEMENT_URL,
+  GROUP_MANAGEMENT_URL,
+  DATA_PUBLICATION_URL,
+  SCIENCE_PORTAL_URL,
+  CADC_SEARCH_URL,
+  OPENSTACK_CLOUD_URL,
+} from '@/lib/config/site-config';
 // Navigation items structure
 export interface NavigationItem {
   label: string;
@@ -28,7 +42,7 @@ export const navigationItems: NavigationItem[] = [
   {
     label: 'Documentation',
     icon: <DocumentationIcon />,
-    href: '#',
+    href: DOCS_URL,
     type: 'link',
   },
   {
@@ -38,32 +52,32 @@ export const navigationItems: NavigationItem[] = [
       {
         label: 'Storage Management',
         icon: <StorageIcon />,
-        href: '/storage',
+        href: STORAGE_MANAGEMENT_URL,
         type: 'link',
       },
       {
         label: 'Group Management',
         icon: <GroupIcon />,
-        href: '/groups',
+        href: GROUP_MANAGEMENT_URL,
         type: 'link',
       },
       {
         label: 'Data Publication',
-        icon: <PublishIcon />,
-        href: '#',
+        icon: <LinkIcon />,
+        href: DATA_PUBLICATION_URL,
         type: 'link',
       },
       {
         label: 'Science Portal',
-        icon: <ScienceIcon />,
-        href: '/science-portal',
+        icon: <ViewInArIcon />,
+        href: SCIENCE_PORTAL_URL,
         type: 'link',
       },
-      { label: 'CADC Search', icon: <SearchIcon />, href: '#', type: 'link' },
+      { label: 'CADC Search', icon: <SearchIcon />, href: CADC_SEARCH_URL, type: 'link' },
       {
         label: 'OpenStack Cloud',
-        icon: <CloudIcon />,
-        href: '#',
+        icon: <PowerSettingsNewIcon />,
+        href: OPENSTACK_CLOUD_URL,
         type: 'link',
       },
     ],
@@ -71,24 +85,24 @@ export const navigationItems: NavigationItem[] = [
   {
     label: 'About',
     icon: <InfoIcon />,
-    href: '#',
+    href: ABOUT_URL,
     type: 'link',
   },
   {
     label: 'Open Source',
     icon: <DiamondIcon />,
-    href: '#',
+    href: OPEN_SOURCE_URL,
     type: 'link',
   },
   {
     label: 'Support',
     type: 'menu',
     menuItems: [
-      { label: 'Help', icon: <HelpIcon />, href: '#', type: 'link' },
+      { label: 'Help', icon: <HelpIcon />, href: SUPPORT_EMAIL, type: 'link' },
       {
-        label: 'Join us on Slack',
+        label: 'Join us on Discord',
         icon: <ChatIcon />,
-        href: '#',
+        href: DISCORD_URL,
         type: 'link',
       },
     ],

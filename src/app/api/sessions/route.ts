@@ -109,6 +109,11 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     formData.append('ram', body.ram.toString());
   }
 
+  // Add gpus if provided and > 0 (API doesn't accept 0)
+  if (body.gpus && body.gpus > 0) {
+    formData.append('gpus', body.gpus.toString());
+  }
+
   // Add cmd if provided (for headless sessions)
   if (body.cmd) {
     formData.append('cmd', body.cmd);

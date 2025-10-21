@@ -104,7 +104,9 @@ export class ApiLogger {
 
     if (data !== undefined) {
       console.log('\n📦 Response Data:');
-      if (typeof data === 'object') {
+      if (data === null) {
+        console.log('null');
+      } else if (typeof data === 'object') {
         // Mask sensitive fields
         const sanitized = JSON.parse(JSON.stringify(data));
         if (sanitized.password) sanitized.password = '***REDACTED***';
@@ -128,7 +130,9 @@ export class ApiLogger {
 
     if (data !== undefined) {
       console.log('\n📦 Response Data:');
-      if (typeof data === 'object') {
+      if (data === null) {
+        console.log('null');
+      } else if (typeof data === 'object') {
         // Mask sensitive fields
         const sanitized = JSON.parse(JSON.stringify(data));
         if (sanitized.password) sanitized.password = '***REDACTED***';

@@ -34,7 +34,7 @@ export const PlatformLoadImpl: React.FC<PlatformLoadProps> = ({
     const dateStr = typeof data.lastUpdate === 'string'
       ? data.lastUpdate
       : data.lastUpdate.toISOString();
-    return `last update: ${dateStr.replace('T', ' ').slice(0, -5)} UTC`;
+    return dateStr.replace('T', ' ').slice(0, -5) + ' UTC';
   }, [data.lastUpdate]);
 
   return (
@@ -151,14 +151,25 @@ export const PlatformLoadImpl: React.FC<PlatformLoadProps> = ({
           variant="caption"
           color="text.secondary"
           sx={{
-            fontFamily: 'monospace', // Use built-in monospace for timestamp consistency
+            fontSize: '10px',
             [theme.breakpoints.down('sm')]: {
-              fontSize: theme.typography.caption.fontSize, // Use theme typography
               textAlign: 'center',
             },
           }}
         >
-          {formattedLastUpdate}
+          Last update:{' '}
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{
+              fontSize: '10px',
+              fontWeight: 'bold',
+              fontFamily: 'monospace',
+              color: 'primary.500',
+            }}
+          >
+            {formattedLastUpdate}
+          </Typography>
         </Typography>
       </Box>
     </Paper>
