@@ -65,6 +65,25 @@ export const serverApiConfig = {
     baseUrl: process.env.LOGIN_API || process.env.NEXT_PUBLIC_LOGIN_API || '',
     timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
+  ac: {
+    baseUrl: process.env.AC_API || process.env.NEXT_PUBLIC_AC_API || 'https://ws-uv.canfar.net/ac',
+    timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
+  },
+  passwordReset: {
+    url: process.env.PASSWORD_RESET_URL || process.env.NEXT_PUBLIC_PASSWORD_RESET_URL || 'https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/access/passwordResetRequest',
+    timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
+  },
+  registration: {
+    url: process.env.REGISTRATION_URL || process.env.NEXT_PUBLIC_REGISTRATION_URL || 'https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/access/control/proxy',
+    timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
+    // CADC proxy servlet headers for user registration
+    proxyHeaders: {
+      resourceId: process.env.CADC_PROXY_RESOURCE_ID || 'ivo://cadc.nrc.ca/gms',
+      standardId: process.env.CADC_PROXY_STANDARD_ID || 'ivo://ivoa.net/std/UMS#reqs-0.1',
+      authType: process.env.CADC_PROXY_AUTH_TYPE || 'anon',
+      interfaceTypeId: process.env.CADC_PROXY_INTERFACE_TYPE_ID || 'http://www.ivoa.net/xml/VODataService/v1.1#ParamHTTP',
+    },
+  },
   skaha: {
     baseUrl: getSkahaBaseUrl(),
     timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),

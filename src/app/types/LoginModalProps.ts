@@ -45,6 +45,14 @@ export interface LoginModalProps
    * Custom authentication handler
    */
   onSubmit?: (credentials: LoginCredentials) => void | Promise<void>;
+  /**
+   * Callback fired when user clicks "Forgot your Account information?"
+   */
+  onForgotPassword?: () => void;
+  /**
+   * Callback fired when user clicks "Request a CADC Account"
+   */
+  onRequestAccount?: () => void;
 }
 
 export interface LoginCredentials {

@@ -41,6 +41,8 @@ export const LoginModalImpl = React.forwardRef<HTMLDivElement, LoginModalProps>(
       onLoginSuccess,
       onLoginError,
       onSubmit,
+      onForgotPassword,
+      onRequestAccount,
       initialUsername = '',
       initialRememberMe = false,
       isLoading = false,
@@ -310,30 +312,78 @@ export const LoginModalImpl = React.forwardRef<HTMLDivElement, LoginModalProps>(
               <Box
                 sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}
               >
-                <Link
-                  href={FORGOT_ACCOUNT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  underline="hover"
-                  sx={(theme) => ({
-                    fontSize: '0.875rem',
-                    fontFamily: theme.typography.fontFamily,
-                  })}
-                >
-                  Forgot your Account information?
-                </Link>
-                <Link
-                  href={REQUEST_ACCOUNT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  underline="hover"
-                  sx={(theme) => ({
-                    fontSize: '0.875rem',
-                    fontFamily: theme.typography.fontFamily,
-                  })}
-                >
-                  Request a CADC Account
-                </Link>
+                {onForgotPassword ? (
+                  <Link
+                    component="button"
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onForgotPassword();
+                    }}
+                    underline="hover"
+                    disabled={showLoading}
+                    sx={(theme) => ({
+                      fontSize: '0.875rem',
+                      fontFamily: theme.typography.fontFamily,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'none',
+                      padding: 0,
+                    })}
+                  >
+                    Forgot your Account information?
+                  </Link>
+                ) : (
+                  <Link
+                    href={FORGOT_ACCOUNT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    underline="hover"
+                    sx={(theme) => ({
+                      fontSize: '0.875rem',
+                      fontFamily: theme.typography.fontFamily,
+                    })}
+                  >
+                    Forgot your Account information?
+                  </Link>
+                )}
+                {onRequestAccount ? (
+                  <Link
+                    component="button"
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onRequestAccount();
+                    }}
+                    underline="hover"
+                    disabled={showLoading}
+                    sx={(theme) => ({
+                      fontSize: '0.875rem',
+                      fontFamily: theme.typography.fontFamily,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'none',
+                      padding: 0,
+                    })}
+                  >
+                    Request a CADC Account
+                  </Link>
+                ) : (
+                  <Link
+                    href={REQUEST_ACCOUNT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    underline="hover"
+                    sx={(theme) => ({
+                      fontSize: '0.875rem',
+                      fontFamily: theme.typography.fontFamily,
+                    })}
+                  >
+                    Request a CADC Account
+                  </Link>
+                )}
               </Box>
             </Box>
           </DialogContent>

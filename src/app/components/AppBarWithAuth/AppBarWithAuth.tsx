@@ -4,6 +4,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { AppBar } from '@/app/components/AppBar/AppBar';
 import { AppBarProps } from '@/app/types/AppBarProps';
 import { LoginModal } from '@/app/components/LoginModal/LoginModal';
+import { ResetPasswordModal } from '@/app/components/ResetPasswordModal/ResetPasswordModal';
+import { RegistrationModal } from '@/app/components/RegistrationModal/RegistrationModal';
 import {
   useAuthStatus,
   useLogin,
@@ -52,6 +54,8 @@ export function AppBarWithAuth({
   ...otherProps
 }: AppBarWithAuthProps) {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [registrationModalOpen, setRegistrationModalOpen] = useState(false);
   const { data: authStatus, isLoading: isCheckingAuth } = useAuthStatus();
   const { mutate: login, isPending: isLoggingIn, error: loginError } = useLogin();
   const { mutate: logout } = useLogout();
@@ -119,7 +123,21 @@ export function AppBarWithAuth({
   }, []);
 
   const handleResetPassword = useCallback(() => {
-    window.open(RESET_PASSWORD_URL, '_blank', 'noopener,noreferrer');
+    // Open reset password modal in CANFAR mode
+    // In OIDC mode, this menu item is not shown
+    setResetPasswordModalOpen(true);
+  }, []);
+
+  const handleForgotPassword = useCallback(() => {
+    // Close login modal and open reset password modal
+    setLoginModalOpen(false);
+    setResetPasswordModalOpen(true);
+  }, []);
+
+  const handleRequestAccount = useCallback(() => {
+    // Close login modal and open registration modal
+    setLoginModalOpen(false);
+    setRegistrationModalOpen(true);
   }, []);
 
   const handleObtainCertificate = useCallback(() => {
@@ -274,8 +292,24 @@ export function AppBarWithAuth({
           open={loginModalOpen}
           onClose={handleCloseLogin}
           onSubmit={handleLogin}
+          onForgotPassword={handleForgotPassword}
+          onRequestAccount={handleRequestAccount}
           isLoading={isLoggingIn}
           errorMessage={loginError?.message}
+        />
+      )}
+      {/* Only show reset password modal in CANFAR mode */}
+      {!isOIDCMode && (
+        <ResetPasswordModal
+          open={resetPasswordModalOpen}
+          onClose={() => setResetPasswordModalOpen(false)}
+        />
+      )}
+      {/* Only show registration modal in CANFAR mode */}
+      {!isOIDCMode && (
+        <RegistrationModal
+          open={registrationModalOpen}
+          onClose={() => setRegistrationModalOpen(false)}
         />
       )}
     </>
