@@ -31,7 +31,7 @@ ARG NEXT_PUBLIC_SKAHA_API=https://ws-uv.canfar.net/skaha
 ARG NEXT_PUBLIC_SRC_SKAHA_API=https://src.canfar.net/skaha
 ARG NEXT_PUBLIC_SRC_CAVERN_API=https://src.canfar.net/cavern
 ARG NEXT_PUBLIC_API_TIMEOUT=30000
-ARG NEXT_PUBLIC_USE_CANFAR=false
+ARG NEXT_PUBLIC_USE_CANFAR=true
 ARG NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS=false
 
 # Set environment variables for build
