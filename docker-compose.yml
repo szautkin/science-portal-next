@@ -12,7 +12,7 @@ services:
         NEXT_PUBLIC_SRC_SKAHA_API: https://src.canfar.net/skaha
         NEXT_PUBLIC_SRC_CAVERN_API: https://src.canfar.net/cavern
         NEXT_PUBLIC_API_TIMEOUT: "30000"
-        NEXT_PUBLIC_USE_CANFAR: "false"
+        NEXT_PUBLIC_USE_CANFAR: "true"
         NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS: "false"
     container_name: science-portal-nextjs
     restart: unless-stopped
@@ -34,8 +34,8 @@ services:
       - NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS=false
 
       # Authentication mode
-      - NEXT_USE_CANFAR=false
-      - NEXT_PUBLIC_USE_CANFAR=false
+      - NEXT_USE_CANFAR=true
+      - NEXT_PUBLIC_USE_CANFAR=true
 
       # NextAuth configuration
       - AUTH_SECRET=${AUTH_SECRET:-your-super-secret-key-change-this-in-production-32-chars-minimum}
@@ -74,7 +74,7 @@ services:
         NEXT_PUBLIC_SRC_SKAHA_API: https://src.canfar.net/skaha
         NEXT_PUBLIC_SRC_CAVERN_API: https://src.canfar.net/cavern
         NEXT_PUBLIC_API_TIMEOUT: "30000"
-        NEXT_PUBLIC_USE_CANFAR: "false"
+        NEXT_PUBLIC_USE_CANFAR: "true"
         NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS: "false"
     container_name: science-portal-nginx
     restart: unless-stopped
