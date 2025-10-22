@@ -36,8 +36,9 @@ import {
 } from '@/lib/config/site-config';
 
 export default function SciencePortalPage() {
-  // Check if in OIDC mode
-  const isOIDCMode = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_CANFAR !== 'true';
+  // Check if in OIDC mode (CANFAR mode when NEXT_PUBLIC_USE_CANFAR=true)
+  // Environment variables are available at build time, so no need to check window
+  const isOIDCMode = process.env.NEXT_PUBLIC_USE_CANFAR !== 'true';
 
   // Get NextAuth session to extract and save token
   const { data: session, status: sessionStatus } = useSession();

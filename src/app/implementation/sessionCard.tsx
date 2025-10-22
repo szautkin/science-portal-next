@@ -596,7 +596,7 @@ export const SessionCardImpl = React.forwardRef<
                       },
                     }}
                   >
-                    vGPU:
+                    GPU:
                   </Typography>
                   <Typography
                     variant="body2"

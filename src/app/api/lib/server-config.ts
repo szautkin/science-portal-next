@@ -33,13 +33,13 @@ function getSkahaBaseUrl(): string {
 
 /**
  * Get Storage API base URL based on auth mode
- * - OIDC mode: Uses SRC Cavern API (src.canfar.net/cavern - accepts SKA IAM tokens)
+ * - OIDC mode: Uses SRC Cavern API (src.canfar.net/cavern/nodes/home/ - accepts SKA IAM tokens)
  * - CANFAR mode: Uses SERVICE_STORAGE_API (standard CANFAR storage)
  */
 function getStorageBaseUrl(): string {
   if (isOIDCMode()) {
     // OIDC mode: Use SRC Cavern API that accepts SKA IAM tokens
-    const srcCavernApi = process.env.NEXT_PUBLIC_SRC_CAVERN_API || process.env.SRC_CAVERN_API || 'https://src.canfar.net/cavern';
+    const srcCavernApi = process.env.NEXT_PUBLIC_SRC_CAVERN_API || process.env.SRC_CAVERN_API || 'https://src.canfar.net/cavern/nodes/home/';
     console.log('🔍 Server config - OIDC mode, using SRC Cavern API:', srcCavernApi);
     return srcCavernApi;
   } else {

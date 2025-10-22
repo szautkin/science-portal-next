@@ -27,6 +27,7 @@ import { useQueryStates, parseAsString, parseAsInteger } from 'nuqs';
 import { Select } from '@/app/components/Select/Select';
 import { TextField } from '@/app/components/TextField/TextField';
 import { Card, CardContent } from '@/app/components/Card';
+import { CanfarRange } from '@/app/components/CanfarRange/CanfarRange';
 import {
   SessionLaunchFormProps,
   SessionFormData,
@@ -42,6 +43,7 @@ import {
   NOTEBOOK_TYPE,
   SKAHA_PROJECT,
 } from '@/lib/config/constants';
+import { startsWithNumber } from '@/lib/utils/validation';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -71,6 +73,9 @@ const DEFAULT_MEMORY_OPTIONS = [
   80, 92, 112, 128, 140, 170, 192,
 ];
 const DEFAULT_CORE_OPTIONS = Array.from({ length: 16 }, (_, i) => i + 1);
+
+// Read experimental feature flag from env
+const USE_EXPERIMENTAL_FEATURES = process.env.NEXT_PUBLIC_EXPERIMENTAL === 'true';
 
 export const SessionLaunchFormImpl = React.forwardRef<
   HTMLDivElement,
@@ -383,6 +388,66 @@ export const SessionLaunchFormImpl = React.forwardRef<
         setUrlParams({ cores: formData.cores, memory: formData.memory, gpus: formData.gpus ?? 0 });
       }
     };
+
+    const handleRangeChange = useCallback(
+      (field: 'memory' | 'cores' | 'gpus') => (value: number) => {
+        setFormData((prev) => ({
+          ...prev,
+          [field]: value,
+        }));
+        setUrlParams({ [field]: value });
+      },
+      [setUrlParams]
+    );
+
+    // Input change handlers with startsWithNumber validation
+    const handleInputChange = useCallback(
+      (field: 'memory' | 'cores' | 'gpus', availableOptions: number[]) =>
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+          const maybeNumber = Number(event.target.value);
+          const maxValue = availableOptions[availableOptions.length - 1];
+
+          // Allow typing if value is positive, <= max, and starts with a valid option
+          if (
+            maybeNumber > 0 &&
+            maybeNumber <= maxValue &&
+            availableOptions.some((num) => startsWithNumber(maybeNumber, num))
+          ) {
+            setFormData((prev) => ({
+              ...prev,
+              [field]: maybeNumber,
+            }));
+          }
+        },
+      []
+    );
+
+    // Input blur handlers - validate exact match
+    const handleInputBlur = useCallback(
+      (field: 'memory' | 'cores' | 'gpus', availableOptions: number[], defaultValue: number) =>
+        (event: React.FocusEvent<HTMLInputElement>) => {
+          const maybeNumber = Number(event.target.value);
+          const maxValue = availableOptions[availableOptions.length - 1];
+
+          // If value doesn't exist exactly in available options, reset to default
+          if (
+            !(
+              maybeNumber > 0 &&
+              maybeNumber <= maxValue &&
+              availableOptions.includes(maybeNumber)
+            )
+          ) {
+            setFormData((prev) => ({
+              ...prev,
+              [field]: defaultValue,
+            }));
+          } else {
+            // Update URL with valid value
+            setUrlParams({ [field]: maybeNumber });
+          }
+        },
+      [setUrlParams]
+    );
 
     // Helper component for the help icon tooltip
     const HelpIcon = ({ title }: { title: string }) => (
@@ -721,107 +786,224 @@ export const SessionLaunchFormImpl = React.forwardRef<
                   </Grid>
                 )}
 
-                {/* Conditional Memory, CPU, and vGPU fields when Fixed is selected and supported */}
+                {/* Conditional Memory, CPU, and GPU fields when Fixed is selected and supported */}
                 {supportsResourceConfig && resourceType === 'fixed' && (
-                  <Grid container alignItems="center" spacing={2}>
+                  <Grid container alignItems="flex-start" spacing={2}>
                     <Grid size={{ xs: 12, sm: 4 }}>
                       {/* Empty grid for alignment */}
                     </Grid>
                     <Grid size={{ xs: 12, sm: 8 }}>
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <Box sx={{ flex: 1 }}>
-                          <FormLabel
-                            sx={{
-                              fontSize: '0.75rem',
-                              fontWeight: 400,
-                              mb: 0.5,
-                            }}
-                          >
-                            Memory (GB)
-                          </FormLabel>
-                          <Select
-                            id="session-memory"
-                            value={String(formData.memory)}
-                            onChange={
-                              handleSelectChange('memory') as React.ComponentProps<
-                                typeof Select
-                              >['onChange']
-                            }
-                            disabled={isLoading}
-                            fullWidth
-                            size="sm"
-                          >
-                            {(memoryOptions || DEFAULT_MEMORY_OPTIONS).map(
-                              (mem) => (
-                                <MenuItem key={mem} value={String(mem)}>
-                                  {mem}
+                      {USE_EXPERIMENTAL_FEATURES ? (
+                        <Grid container spacing={2}>
+                          {/* Memory Column */}
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                                mb: 1,
+                                display: 'block',
+                              }}
+                            >
+                              Memory (GB)
+                            </FormLabel>
+                            <CanfarRange
+                              value={formData.memory}
+                              range={memoryOptions || DEFAULT_MEMORY_OPTIONS}
+                              onChange={handleRangeChange('memory')}
+                              disabled={isLoading}
+                              label="Memory (GB)"
+                            />
+                            <TextField
+                              type="number"
+                              value={formData.memory}
+                              onChange={handleInputChange('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS)}
+                              onBlur={handleInputBlur('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS, DEFAULT_RAM_NUMBER)}
+                              disabled={isLoading}
+                              inputProps={{
+                                min: 1,
+                                max: (memoryOptions || DEFAULT_MEMORY_OPTIONS)[(memoryOptions || DEFAULT_MEMORY_OPTIONS).length - 1],
+                              }}
+                              fullWidth
+                              size="sm"
+                              sx={{ mt: 1 }}
+                            />
+                          </Grid>
+
+                          {/* CPU Cores Column */}
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                                mb: 1,
+                                display: 'block',
+                              }}
+                            >
+                              CPU Cores
+                            </FormLabel>
+                            <CanfarRange
+                              value={formData.cores}
+                              range={coreOptions || DEFAULT_CORE_OPTIONS}
+                              onChange={handleRangeChange('cores')}
+                              disabled={isLoading}
+                              label="CPU Cores"
+                            />
+                            <TextField
+                              type="number"
+                              value={formData.cores}
+                              onChange={handleInputChange('cores', coreOptions || DEFAULT_CORE_OPTIONS)}
+                              onBlur={handleInputBlur('cores', coreOptions || DEFAULT_CORE_OPTIONS, DEFAULT_CORES_NUMBER)}
+                              disabled={isLoading}
+                              inputProps={{
+                                min: 1,
+                                max: (coreOptions || DEFAULT_CORE_OPTIONS)[(coreOptions || DEFAULT_CORE_OPTIONS).length - 1],
+                              }}
+                              fullWidth
+                              size="sm"
+                              sx={{ mt: 1 }}
+                            />
+                          </Grid>
+
+                          {/* GPU Column */}
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                                mb: 1,
+                                display: 'block',
+                              }}
+                            >
+                              GPU
+                            </FormLabel>
+                            <CanfarRange
+                              value={formData.gpus || 0}
+                              range={gpuOptions || [0]}
+                              onChange={handleRangeChange('gpus')}
+                              disabled={isLoading}
+                              label="GPU"
+                            />
+                            <TextField
+                              type="number"
+                              value={formData.gpus || 0}
+                              onChange={handleInputChange('gpus', gpuOptions || [0])}
+                              onBlur={handleInputBlur('gpus', gpuOptions || [0], 0)}
+                              disabled={isLoading}
+                              inputProps={{
+                                min: 0,
+                                max: gpuOptions?.[gpuOptions.length - 1] || 0,
+                              }}
+                              fullWidth
+                              size="sm"
+                              sx={{ mt: 1 }}
+                            />
+                          </Grid>
+                        </Grid>
+                      ) : (
+                        <Grid container spacing={2}>
+                          {/* Memory Column */}
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                                mb: 1,
+                                display: 'block',
+                              }}
+                            >
+                              Memory (GB)
+                            </FormLabel>
+                            <Select
+                              id="session-memory"
+                              value={String(formData.memory)}
+                              onChange={
+                                handleSelectChange('memory') as React.ComponentProps<
+                                  typeof Select
+                                >['onChange']
+                              }
+                              disabled={isLoading}
+                              fullWidth
+                              size="sm"
+                            >
+                              {(memoryOptions || DEFAULT_MEMORY_OPTIONS).map(
+                                (mem) => (
+                                  <MenuItem key={mem} value={String(mem)}>
+                                    {mem}
+                                  </MenuItem>
+                                )
+                              )}
+                            </Select>
+                          </Grid>
+
+                          {/* CPU Cores Column */}
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                                mb: 1,
+                                display: 'block',
+                              }}
+                            >
+                              CPU Cores
+                            </FormLabel>
+                            <Select
+                              id="session-cores"
+                              value={String(formData.cores)}
+                              onChange={
+                                handleSelectChange('cores') as React.ComponentProps<
+                                  typeof Select
+                                >['onChange']
+                              }
+                              disabled={isLoading}
+                              fullWidth
+                              size="sm"
+                            >
+                              {(coreOptions || DEFAULT_CORE_OPTIONS).map((core) => (
+                                <MenuItem key={core} value={String(core)}>
+                                  {core}
                                 </MenuItem>
-                              )
-                            )}
-                          </Select>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <FormLabel
-                            sx={{
-                              fontSize: '0.75rem',
-                              fontWeight: 400,
-                              mb: 0.5,
-                            }}
-                          >
-                            CPU Cores
-                          </FormLabel>
-                          <Select
-                            id="session-cores"
-                            value={String(formData.cores)}
-                            onChange={
-                              handleSelectChange('cores') as React.ComponentProps<
-                                typeof Select
-                              >['onChange']
-                            }
-                            disabled={isLoading}
-                            fullWidth
-                            size="sm"
-                          >
-                            {(coreOptions || DEFAULT_CORE_OPTIONS).map((core) => (
-                              <MenuItem key={core} value={String(core)}>
-                                {core}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <FormLabel
-                            sx={{
-                              fontSize: '0.75rem',
-                              fontWeight: 400,
-                              mb: 0.5,
-                            }}
-                          >
-                            vGPU
-                          </FormLabel>
-                          <Select
-                            id="session-gpus"
-                            value={String(formData.gpus || 0)}
-                            onChange={
-                              handleSelectChange('gpus') as React.ComponentProps<
-                                typeof Select
-                              >['onChange']
-                            }
-                            disabled={isLoading}
-                            fullWidth
-                            size="sm"
-                          >
-                            {/* Always show "None" option first */}
-                            <MenuItem value="0">None</MenuItem>
-                            {/* Then show other GPU options if available */}
-                            {gpuOptions?.filter(gpu => gpu > 0).map((gpu) => (
-                              <MenuItem key={gpu} value={String(gpu)}>
-                                {gpu}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </Box>
-                      </Box>
+                              ))}
+                            </Select>
+                          </Grid>
+
+                          {/* GPU Column */}
+                          <Grid size={{ xs: 12, sm: 4 }}>
+                            <FormLabel
+                              sx={{
+                                fontSize: '0.75rem',
+                                fontWeight: 400,
+                                mb: 1,
+                                display: 'block',
+                              }}
+                            >
+                              GPU
+                            </FormLabel>
+                            <Select
+                              id="session-gpus"
+                              value={String(formData.gpus || 0)}
+                              onChange={
+                                handleSelectChange('gpus') as React.ComponentProps<
+                                  typeof Select
+                                >['onChange']
+                              }
+                              disabled={isLoading}
+                              fullWidth
+                              size="sm"
+                            >
+                              {/* Always show "None" option first */}
+                              <MenuItem value="0">None</MenuItem>
+                              {/* Then show other GPU options if available */}
+                              {gpuOptions?.filter(gpu => gpu > 0).map((gpu) => (
+                                <MenuItem key={gpu} value={String(gpu)}>
+                                  {gpu}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </Grid>
+                        </Grid>
+                      )}
                     </Grid>
                   </Grid>
                 )}
@@ -1136,107 +1318,224 @@ export const SessionLaunchFormImpl = React.forwardRef<
                           </Grid>
                         </Grid>
 
-                        {/* Conditional Memory, CPU, and vGPU fields when Fixed is selected */}
+                        {/* Conditional Memory, CPU, and GPU fields when Fixed is selected */}
                         {resourceType === 'fixed' && (
-                          <Grid container alignItems="center" spacing={2}>
+                          <Grid container alignItems="flex-start" spacing={2}>
                             <Grid size={{ xs: 12, sm: 4 }}>
                               {/* Empty grid for alignment */}
                             </Grid>
                             <Grid size={{ xs: 12, sm: 8 }}>
-                              <Box sx={{ display: 'flex', gap: 2 }}>
-                                <Box sx={{ flex: 1 }}>
-                                  <FormLabel
-                                    sx={{
-                                      fontSize: '0.75rem',
-                                      fontWeight: 400,
-                                      mb: 0.5,
-                                    }}
-                                  >
-                                    Memory (GB)
-                                  </FormLabel>
-                                  <Select
-                                    id="advanced-session-memory"
-                                    value={String(formData.memory)}
-                                    onChange={
-                                      handleSelectChange('memory') as React.ComponentProps<
-                                        typeof Select
-                                      >['onChange']
-                                    }
-                                    disabled={isLoading}
-                                    fullWidth
-                                    size="sm"
-                                  >
-                                    {(memoryOptions || DEFAULT_MEMORY_OPTIONS).map(
-                                      (mem) => (
-                                        <MenuItem key={mem} value={String(mem)}>
-                                          {mem}
+                              {USE_EXPERIMENTAL_FEATURES ? (
+                                <Grid container spacing={2}>
+                                  {/* Memory Column */}
+                                  <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormLabel
+                                      sx={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        mb: 1,
+                                        display: 'block',
+                                      }}
+                                    >
+                                      Memory (GB)
+                                    </FormLabel>
+                                    <CanfarRange
+                                      value={formData.memory}
+                                      range={memoryOptions || DEFAULT_MEMORY_OPTIONS}
+                                      onChange={handleRangeChange('memory')}
+                                      disabled={isLoading}
+                                      label="Memory (GB)"
+                                    />
+                                    <TextField
+                                      type="number"
+                                      value={formData.memory}
+                                      onChange={handleInputChange('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS)}
+                                      onBlur={handleInputBlur('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS, DEFAULT_RAM_NUMBER)}
+                                      disabled={isLoading}
+                                      inputProps={{
+                                        min: 1,
+                                        max: (memoryOptions || DEFAULT_MEMORY_OPTIONS)[(memoryOptions || DEFAULT_MEMORY_OPTIONS).length - 1],
+                                      }}
+                                      fullWidth
+                                      size="sm"
+                                      sx={{ mt: 1 }}
+                                    />
+                                  </Grid>
+
+                                  {/* CPU Cores Column */}
+                                  <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormLabel
+                                      sx={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        mb: 1,
+                                        display: 'block',
+                                      }}
+                                    >
+                                      CPU Cores
+                                    </FormLabel>
+                                    <CanfarRange
+                                      value={formData.cores}
+                                      range={coreOptions || DEFAULT_CORE_OPTIONS}
+                                      onChange={handleRangeChange('cores')}
+                                      disabled={isLoading}
+                                      label="CPU Cores"
+                                    />
+                                    <TextField
+                                      type="number"
+                                      value={formData.cores}
+                                      onChange={handleInputChange('cores', coreOptions || DEFAULT_CORE_OPTIONS)}
+                                      onBlur={handleInputBlur('cores', coreOptions || DEFAULT_CORE_OPTIONS, DEFAULT_CORES_NUMBER)}
+                                      disabled={isLoading}
+                                      inputProps={{
+                                        min: 1,
+                                        max: (coreOptions || DEFAULT_CORE_OPTIONS)[(coreOptions || DEFAULT_CORE_OPTIONS).length - 1],
+                                      }}
+                                      fullWidth
+                                      size="sm"
+                                      sx={{ mt: 1 }}
+                                    />
+                                  </Grid>
+
+                                  {/* GPU Column */}
+                                  <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormLabel
+                                      sx={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        mb: 1,
+                                        display: 'block',
+                                      }}
+                                    >
+                                      GPU
+                                    </FormLabel>
+                                    <CanfarRange
+                                      value={formData.gpus || 0}
+                                      range={gpuOptions || [0]}
+                                      onChange={handleRangeChange('gpus')}
+                                      disabled={isLoading}
+                                      label="GPU"
+                                    />
+                                    <TextField
+                                      type="number"
+                                      value={formData.gpus || 0}
+                                      onChange={handleInputChange('gpus', gpuOptions || [0])}
+                                      onBlur={handleInputBlur('gpus', gpuOptions || [0], 0)}
+                                      disabled={isLoading}
+                                      inputProps={{
+                                        min: 0,
+                                        max: gpuOptions?.[gpuOptions.length - 1] || 0,
+                                      }}
+                                      fullWidth
+                                      size="sm"
+                                      sx={{ mt: 1 }}
+                                    />
+                                  </Grid>
+                                </Grid>
+                              ) : (
+                                <Grid container spacing={2}>
+                                  {/* Memory Column */}
+                                  <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormLabel
+                                      sx={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        mb: 1,
+                                        display: 'block',
+                                      }}
+                                    >
+                                      Memory (GB)
+                                    </FormLabel>
+                                    <Select
+                                      id="advanced-session-memory"
+                                      value={String(formData.memory)}
+                                      onChange={
+                                        handleSelectChange('memory') as React.ComponentProps<
+                                          typeof Select
+                                        >['onChange']
+                                      }
+                                      disabled={isLoading}
+                                      fullWidth
+                                      size="sm"
+                                    >
+                                      {(memoryOptions || DEFAULT_MEMORY_OPTIONS).map(
+                                        (mem) => (
+                                          <MenuItem key={mem} value={String(mem)}>
+                                            {mem}
+                                          </MenuItem>
+                                        )
+                                      )}
+                                    </Select>
+                                  </Grid>
+
+                                  {/* CPU Cores Column */}
+                                  <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormLabel
+                                      sx={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        mb: 1,
+                                        display: 'block',
+                                      }}
+                                    >
+                                      CPU Cores
+                                    </FormLabel>
+                                    <Select
+                                      id="advanced-session-cores"
+                                      value={String(formData.cores)}
+                                      onChange={
+                                        handleSelectChange('cores') as React.ComponentProps<
+                                          typeof Select
+                                        >['onChange']
+                                      }
+                                      disabled={isLoading}
+                                      fullWidth
+                                      size="sm"
+                                    >
+                                      {(coreOptions || DEFAULT_CORE_OPTIONS).map((core) => (
+                                        <MenuItem key={core} value={String(core)}>
+                                          {core}
                                         </MenuItem>
-                                      )
-                                    )}
-                                  </Select>
-                                </Box>
-                                <Box sx={{ flex: 1 }}>
-                                  <FormLabel
-                                    sx={{
-                                      fontSize: '0.75rem',
-                                      fontWeight: 400,
-                                      mb: 0.5,
-                                    }}
-                                  >
-                                    CPU Cores
-                                  </FormLabel>
-                                  <Select
-                                    id="advanced-session-cores"
-                                    value={String(formData.cores)}
-                                    onChange={
-                                      handleSelectChange('cores') as React.ComponentProps<
-                                        typeof Select
-                                      >['onChange']
-                                    }
-                                    disabled={isLoading}
-                                    fullWidth
-                                    size="sm"
-                                  >
-                                    {(coreOptions || DEFAULT_CORE_OPTIONS).map((core) => (
-                                      <MenuItem key={core} value={String(core)}>
-                                        {core}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </Box>
-                                <Box sx={{ flex: 1 }}>
-                                  <FormLabel
-                                    sx={{
-                                      fontSize: '0.75rem',
-                                      fontWeight: 400,
-                                      mb: 0.5,
-                                    }}
-                                  >
-                                    vGPU
-                                  </FormLabel>
-                                  <Select
-                                    id="advanced-session-gpus"
-                                    value={String(formData.gpus || 0)}
-                                    onChange={
-                                      handleSelectChange('gpus') as React.ComponentProps<
-                                        typeof Select
-                                      >['onChange']
-                                    }
-                                    disabled={isLoading}
-                                    fullWidth
-                                    size="sm"
-                                  >
-                                    {/* Always show "None" option first */}
-                                    <MenuItem value="0">None</MenuItem>
-                                    {/* Then show other GPU options if available */}
-                                    {gpuOptions?.filter(gpu => gpu > 0).map((gpu) => (
-                                      <MenuItem key={gpu} value={String(gpu)}>
-                                        {gpu}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </Box>
-                              </Box>
+                                      ))}
+                                    </Select>
+                                  </Grid>
+
+                                  {/* GPU Column */}
+                                  <Grid size={{ xs: 12, sm: 4 }}>
+                                    <FormLabel
+                                      sx={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 400,
+                                        mb: 1,
+                                        display: 'block',
+                                      }}
+                                    >
+                                      GPU
+                                    </FormLabel>
+                                    <Select
+                                      id="advanced-session-gpus"
+                                      value={String(formData.gpus || 0)}
+                                      onChange={
+                                        handleSelectChange('gpus') as React.ComponentProps<
+                                          typeof Select
+                                        >['onChange']
+                                      }
+                                      disabled={isLoading}
+                                      fullWidth
+                                      size="sm"
+                                    >
+                                      {/* Always show "None" option first */}
+                                      <MenuItem value="0">None</MenuItem>
+                                      {/* Then show other GPU options if available */}
+                                      {gpuOptions?.filter(gpu => gpu > 0).map((gpu) => (
+                                        <MenuItem key={gpu} value={String(gpu)}>
+                                          {gpu}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </Grid>
+                                </Grid>
+                              )}
                             </Grid>
                           </Grid>
                         )}

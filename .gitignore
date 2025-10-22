@@ -29,6 +29,15 @@ pnpm-debug.log*
 .env*.local
 .env
 .env.production
+.env.development
+
+# Docker Compose files with secrets (use .example versions)
+docker-compose.canfar.yml
+docker-compose.dev.canfar.yml
+docker-compose.oidc.yml
+docker-compose.dev.oidc.yml
+docker-compose.override.yml
+*.local.yml
 
 # Sensitive Kubernetes files
 k8s-secrets.yaml
