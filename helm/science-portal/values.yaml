@@ -137,6 +137,8 @@ env:
     value: "30000"
   - name: NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS
     value: "false"
+  - name: NEXT_PUBLIC_EXPERIMENTAL
+    value: "true"
 
   # Authentication mode
   - name: NEXT_USE_CANFAR

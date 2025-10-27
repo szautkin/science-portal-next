@@ -7,14 +7,17 @@ replicaCount: 2
 # Image configuration
 # Replace with your DigitalOcean Container Registry or Docker Hub repository
 image:
-  repository: registry.digitalocean.com/your-registry/science-portal-nextjs
+  repository: registry.digitalocean.com/ice-image/science-portal-nextjs
   pullPolicy: IfNotPresent
-  tag: "latest" # Use semantic versioning in production (e.g., "1.0.0")
+  # "1.0.0" CANFAR mode (experimental: false)
+  # "1.1.0" OIDC mode (experimental: false)
+  # "1.2.0" CANFAR mode + experimental features
+  tag: "1.2.0"
 
 # If using DigitalOcean Container Registry, create and reference the pull secret:
 # doctl registry kubernetes-manifest | kubectl apply -f -
 imagePullSecrets:
-  - name: registry-science-portal
+  - name: registry-ice-image
 
 # Service configuration
 # Use ClusterIP with Ingress for cost-effective setup
@@ -47,14 +50,14 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
   hosts:
-    - host: science-portal.yourdomain.com # CHANGE THIS to your domain
+    - host: science-portal-next.testapp.ca
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: science-portal-tls
       hosts:
-        - science-portal.yourdomain.com # CHANGE THIS to your domain
+        - science-portal-next.testapp.ca
 
 # Resource limits optimized for DigitalOcean node sizes
 # Adjust based on your node pool configuration
@@ -130,18 +133,20 @@ env:
     value: "30000"
   - name: NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS
     value: "false"
+  - name: NEXT_PUBLIC_EXPERIMENTAL
+    value: "true"
 
   # Authentication mode
   - name: NEXT_USE_CANFAR
-    value: "false"
+    value: "true"
   - name: NEXT_PUBLIC_USE_CANFAR
-    value: "false"
+    value: "true"
 
   # NextAuth configuration
   - name: AUTH_TRUST_HOST
     value: "true"
   - name: NEXTAUTH_URL
-    value: "https://science-portal.yourdomain.com" # CHANGE THIS
+    value: "https://science-portal-next.testapp.ca"
 
 # Secrets configuration
 # Create the secret before deploying:
@@ -157,9 +162,9 @@ secrets:
 # OIDC Configuration - customize for your identity provider
 oidc:
   uri: "https://ska-iam.stfc.ac.uk/"
-  clientId: "your-oidc-client-id" # CHANGE THIS
-  callbackUri: "https://science-portal.yourdomain.com/science-portal" # CHANGE THIS
-  redirectUri: "https://science-portal.yourdomain.com/api/auth/callback/oidc" # CHANGE THIS
+  clientId: "your-oidc-client-id"
+  callbackUri: "https://science-portal-next.testapp.ca/science-portal"
+  redirectUri: "https://science-portal-next.testapp.ca/api/auth/callback/oidc"
   scope: "openid profile offline_access"
 
 # Network Policy - adjust based on your security requirements
