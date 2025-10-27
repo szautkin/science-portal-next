@@ -44,6 +44,11 @@ k8s-secrets.yaml
 secrets/
 .secrets
 
+# Helm values with sensitive data
+helm/**/values-production.yaml
+helm/**/values-staging.yaml
+helm/**/values-*.local.yaml
+
 # Vercel
 .vercel
 

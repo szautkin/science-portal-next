@@ -137,6 +137,8 @@ env:
     value: "30000"
   - name: NEXT_PUBLIC_ENABLE_QUERY_DEVTOOLS
     value: "false"
+  - name: NEXT_PUBLIC_EXPERIMENTAL
+    value: "true"
 
   # Authentication mode
   - name: NEXT_USE_CANFAR
@@ -194,7 +196,7 @@ networkPolicy:
           port: 443 # HTTPS for external APIs
         - protocol: TCP
           port: 53 # DNS
-      - protocol: UDP
+        - protocol: UDP
           port: 53 # DNS
 
 # Pod Disruption Budget
