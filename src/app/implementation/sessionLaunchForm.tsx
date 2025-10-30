@@ -28,6 +28,7 @@ import { Select } from '@/app/components/Select/Select';
 import { TextField } from '@/app/components/TextField/TextField';
 import { Card, CardContent } from '@/app/components/Card';
 import { CanfarRange } from '@/app/components/CanfarRange/CanfarRange';
+import { CanfarResourceInput } from '@/app/components/CanfarResourceInput/CanfarResourceInput';
 import {
   SessionLaunchFormProps,
   SessionFormData,
@@ -131,6 +132,13 @@ export const SessionLaunchFormImpl = React.forwardRef<
     // Initialize resource type based on presence of cores/memory/gpus in URL
     const initialResourceType = (urlParams.cores !== null || urlParams.memory !== null || urlParams.gpus !== null) ? 'fixed' : 'flexible';
     const [resourceType, setResourceType] = useState<'flexible' | 'fixed'>(initialResourceType);
+
+    // Track validation errors for resource inputs (disables Launch button while typing invalid values)
+    const [validationErrors, setValidationErrors] = useState({
+      memory: false,
+      cores: false,
+      gpus: false,
+    });
 
     const [formData, setFormData] = useState<SessionFormData>({
       type: urlParams.type as SessionType,
@@ -350,6 +358,13 @@ export const SessionLaunchFormImpl = React.forwardRef<
       setResourceType('flexible');
       setTabValue(0);
 
+      // Clear validation errors
+      setValidationErrors({
+        memory: false,
+        cores: false,
+        gpus: false,
+      });
+
       // Reset URL parameters to defaults
       setUrlParams({
         tab: 0,
@@ -397,6 +412,17 @@ export const SessionLaunchFormImpl = React.forwardRef<
         setUrlParams({ [field]: value });
       },
       [setUrlParams]
+    );
+
+    // Validation change handler - tracks typing validation errors
+    const handleValidationChange = useCallback(
+      (field: 'memory' | 'cores' | 'gpus') => (hasError: boolean) => {
+        setValidationErrors((prev) => ({
+          ...prev,
+          [field]: hasError,
+        }));
+      },
+      []
     );
 
     // Input change handlers with startsWithNumber validation
@@ -447,6 +473,9 @@ export const SessionLaunchFormImpl = React.forwardRef<
         },
       [setUrlParams]
     );
+
+    // Check if there are any validation errors (while typing invalid values)
+    const hasValidationErrors = validationErrors.memory || validationErrors.cores || validationErrors.gpus;
 
     // Helper component for the help icon tooltip
     const HelpIcon = ({ title }: { title: string }) => (
@@ -813,20 +842,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                               disabled={isLoading}
                               label="Memory (GB)"
                             />
-                            <TextField
-                              type="number"
-                              value={formData.memory}
-                              onChange={handleInputChange('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS)}
-                              onBlur={handleInputBlur('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS, DEFAULT_RAM_NUMBER)}
-                              disabled={isLoading}
-                              inputProps={{
-                                min: 1,
-                                max: (memoryOptions || DEFAULT_MEMORY_OPTIONS)[(memoryOptions || DEFAULT_MEMORY_OPTIONS).length - 1],
-                              }}
-                              fullWidth
-                              size="sm"
-                              sx={{ mt: 1 }}
-                            />
+                            <Box sx={{ mt: 1 }}>
+                              <CanfarResourceInput
+                                value={formData.memory}
+                                options={memoryOptions || DEFAULT_MEMORY_OPTIONS}
+                                onChange={handleRangeChange('memory')}
+                                onValidationChange={handleValidationChange('memory')}
+                                disabled={isLoading}
+                                label="Memory (GB)"
+                              />
+                            </Box>
                           </Grid>
 
                           {/* CPU Cores Column */}
@@ -848,20 +873,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                               disabled={isLoading}
                               label="CPU Cores"
                             />
-                            <TextField
-                              type="number"
-                              value={formData.cores}
-                              onChange={handleInputChange('cores', coreOptions || DEFAULT_CORE_OPTIONS)}
-                              onBlur={handleInputBlur('cores', coreOptions || DEFAULT_CORE_OPTIONS, DEFAULT_CORES_NUMBER)}
-                              disabled={isLoading}
-                              inputProps={{
-                                min: 1,
-                                max: (coreOptions || DEFAULT_CORE_OPTIONS)[(coreOptions || DEFAULT_CORE_OPTIONS).length - 1],
-                              }}
-                              fullWidth
-                              size="sm"
-                              sx={{ mt: 1 }}
-                            />
+                            <Box sx={{ mt: 1 }}>
+                              <CanfarResourceInput
+                                value={formData.cores}
+                                options={coreOptions || DEFAULT_CORE_OPTIONS}
+                                onChange={handleRangeChange('cores')}
+                                onValidationChange={handleValidationChange('cores')}
+                                disabled={isLoading}
+                                label="CPU Cores"
+                              />
+                            </Box>
                           </Grid>
 
                           {/* GPU Column */}
@@ -883,20 +904,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                               disabled={isLoading}
                               label="GPU"
                             />
-                            <TextField
-                              type="number"
-                              value={formData.gpus || 0}
-                              onChange={handleInputChange('gpus', gpuOptions || [0])}
-                              onBlur={handleInputBlur('gpus', gpuOptions || [0], 0)}
-                              disabled={isLoading}
-                              inputProps={{
-                                min: 0,
-                                max: gpuOptions?.[gpuOptions.length - 1] || 0,
-                              }}
-                              fullWidth
-                              size="sm"
-                              sx={{ mt: 1 }}
-                            />
+                            <Box sx={{ mt: 1 }}>
+                              <CanfarResourceInput
+                                value={formData.gpus || 0}
+                                options={gpuOptions || [0]}
+                                onChange={handleRangeChange('gpus')}
+                                onValidationChange={handleValidationChange('gpus')}
+                                disabled={isLoading}
+                                label="GPU"
+                              />
+                            </Box>
                           </Grid>
                         </Grid>
                       ) : (
@@ -1019,7 +1036,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
                       type="submit"
                       variant="contained"
                       size="small"
-                      disabled={isLoading || !formData.project || !formData.containerImage}
+                      disabled={isLoading || !formData.project || !formData.containerImage || hasValidationErrors}
                     >
                       Launch
                     </Button>
@@ -1345,20 +1362,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                                       disabled={isLoading}
                                       label="Memory (GB)"
                                     />
-                                    <TextField
-                                      type="number"
-                                      value={formData.memory}
-                                      onChange={handleInputChange('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS)}
-                                      onBlur={handleInputBlur('memory', memoryOptions || DEFAULT_MEMORY_OPTIONS, DEFAULT_RAM_NUMBER)}
-                                      disabled={isLoading}
-                                      inputProps={{
-                                        min: 1,
-                                        max: (memoryOptions || DEFAULT_MEMORY_OPTIONS)[(memoryOptions || DEFAULT_MEMORY_OPTIONS).length - 1],
-                                      }}
-                                      fullWidth
-                                      size="sm"
-                                      sx={{ mt: 1 }}
-                                    />
+                                    <Box sx={{ mt: 1 }}>
+                                      <CanfarResourceInput
+                                        value={formData.memory}
+                                        options={memoryOptions || DEFAULT_MEMORY_OPTIONS}
+                                        onChange={handleRangeChange('memory')}
+                                        onValidationChange={handleValidationChange('memory')}
+                                        disabled={isLoading}
+                                        label="Memory (GB)"
+                                      />
+                                    </Box>
                                   </Grid>
 
                                   {/* CPU Cores Column */}
@@ -1380,20 +1393,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                                       disabled={isLoading}
                                       label="CPU Cores"
                                     />
-                                    <TextField
-                                      type="number"
-                                      value={formData.cores}
-                                      onChange={handleInputChange('cores', coreOptions || DEFAULT_CORE_OPTIONS)}
-                                      onBlur={handleInputBlur('cores', coreOptions || DEFAULT_CORE_OPTIONS, DEFAULT_CORES_NUMBER)}
-                                      disabled={isLoading}
-                                      inputProps={{
-                                        min: 1,
-                                        max: (coreOptions || DEFAULT_CORE_OPTIONS)[(coreOptions || DEFAULT_CORE_OPTIONS).length - 1],
-                                      }}
-                                      fullWidth
-                                      size="sm"
-                                      sx={{ mt: 1 }}
-                                    />
+                                    <Box sx={{ mt: 1 }}>
+                                      <CanfarResourceInput
+                                        value={formData.cores}
+                                        options={coreOptions || DEFAULT_CORE_OPTIONS}
+                                        onChange={handleRangeChange('cores')}
+                                        onValidationChange={handleValidationChange('cores')}
+                                        disabled={isLoading}
+                                        label="CPU Cores"
+                                      />
+                                    </Box>
                                   </Grid>
 
                                   {/* GPU Column */}
@@ -1415,20 +1424,16 @@ export const SessionLaunchFormImpl = React.forwardRef<
                                       disabled={isLoading}
                                       label="GPU"
                                     />
-                                    <TextField
-                                      type="number"
-                                      value={formData.gpus || 0}
-                                      onChange={handleInputChange('gpus', gpuOptions || [0])}
-                                      onBlur={handleInputBlur('gpus', gpuOptions || [0], 0)}
-                                      disabled={isLoading}
-                                      inputProps={{
-                                        min: 0,
-                                        max: gpuOptions?.[gpuOptions.length - 1] || 0,
-                                      }}
-                                      fullWidth
-                                      size="sm"
-                                      sx={{ mt: 1 }}
-                                    />
+                                    <Box sx={{ mt: 1 }}>
+                                      <CanfarResourceInput
+                                        value={formData.gpus || 0}
+                                        options={gpuOptions || [0]}
+                                        onChange={handleRangeChange('gpus')}
+                                        onValidationChange={handleValidationChange('gpus')}
+                                        disabled={isLoading}
+                                        label="GPU"
+                                      />
+                                    </Box>
                                   </Grid>
                                 </Grid>
                               ) : (
@@ -1554,7 +1559,7 @@ export const SessionLaunchFormImpl = React.forwardRef<
                         type="submit"
                         variant="contained"
                         size="small"
-                        disabled={isLoading}
+                        disabled={isLoading || hasValidationErrors}
                       >
                         Launch
                       </Button>

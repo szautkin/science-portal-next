@@ -63,10 +63,18 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   // Log the fetched GPU options
   console.log('🎮 Fetched GPU options from API:', context?.gpus);
 
-  // Temporarily override GPU options to [0, 1] for testing
+  // Check environment variable to determine if we use dynamic GPU values
+  const useDynamicGpuValues = process.env.NEXT_PUBLIC_DYNAMIC_GPU_VALUES === 'true';
+
   if (context && context.gpus) {
-    context.gpus.options = [0, 1];
-    console.log('🎮 Override GPU options to:', context.gpus.options);
+    if (!useDynamicGpuValues) {
+      // Use hardcoded [0, 1] when dynamic GPU values are disabled
+      context.gpus.options = [0, 1];
+      console.log('🎮 Using hardcoded GPU options:', context.gpus.options);
+    } else {
+      // Use values from API when dynamic GPU values are enabled
+      console.log('🎮 Using dynamic GPU options from API:', context.gpus.options);
+    }
   }
 
   logger.info('Successfully retrieved context information');
