@@ -72,7 +72,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     ram: {
       name: 'RAM',
       used: requestedRAM,
-      free: ramAvailable - requestedRAM,
+      free: +(ramAvailable - requestedRAM).toFixed(2),
     },
     instances: {
       name: 'Instances',

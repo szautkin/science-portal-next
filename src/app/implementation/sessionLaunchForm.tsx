@@ -147,7 +147,6 @@ export const SessionLaunchFormImpl = React.forwardRef<
       repositoryAuthUsername: '',
       repositoryAuthSecret: '',
     });
-    console.log('repositoryHosts', repositoryHosts)
     // Get available projects for the selected session type
     const availableProjects = useMemo(() => {
       const imagesForType = imagesByType[formData.type];

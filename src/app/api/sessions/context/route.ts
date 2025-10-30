@@ -59,6 +59,16 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   }
 
   const context = await response.json();
+
+  // Log the fetched GPU options
+  console.log('🎮 Fetched GPU options from API:', context?.gpus);
+
+  // Temporarily override GPU options to [0, 1] for testing
+  if (context && context.gpus) {
+    context.gpus.options = [0, 1];
+    console.log('🎮 Override GPU options to:', context.gpus.options);
+  }
+
   logger.info('Successfully retrieved context information');
   logger.logSuccess(HTTP_STATUS.OK, context);
   return successResponse(context);

@@ -48,14 +48,6 @@ export default function SciencePortalPage() {
     if (sessionStatus === 'authenticated' && session?.accessToken) {
       // Only save if not already in localStorage
       if (!hasToken()) {
-        console.log('\n' + '💾'.repeat(40));
-        console.log('💾 Main Page - Saving OIDC token to localStorage');
-        console.log('💾'.repeat(40));
-        console.log('📋 Token length:', session.accessToken.length);
-        console.log('📋 FULL TOKEN:');
-        console.log(session.accessToken);
-        console.log('💾'.repeat(40) + '\n');
-
         saveToken(session.accessToken);
       }
     }
@@ -153,6 +145,11 @@ export default function SciencePortalPage() {
       hasData: !!context,
       context
     });
+
+    // Log GPU options specifically
+    if (context?.gpus) {
+      console.log('🎮 GPU options received in component:', context.gpus.options);
+    }
   }, [isAuthenticated, isLoadingContext, isFetchingContext, context]);
 
   // Mutation hooks for session actions

@@ -63,24 +63,11 @@ export function hasToken(): boolean {
 export function getAuthHeader(): Record<string, string> {
   const token = getToken();
 
-  console.log('\n' + '🔑'.repeat(40));
-  console.log('🔑 getAuthHeader() - Reading token from localStorage');
-  console.log('🔑'.repeat(40));
   if (token) {
-    console.log('✅ Token found in localStorage');
-    console.log('📋 Token length:', token.length);
-    console.log('📋 First 100 chars:', token.substring(0, 100));
-    console.log('📋 FULL TOKEN:');
-    console.log(token);
-    console.log('🔑'.repeat(40) + '\n');
-
     return {
       Authorization: `Bearer ${token}`,
     };
   }
-
-  console.log('❌ No token found in localStorage');
-  console.log('🔑'.repeat(40) + '\n');
   return {};
 }
 

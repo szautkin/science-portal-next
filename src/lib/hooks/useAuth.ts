@@ -74,13 +74,10 @@ export function useAuthStatus(
   const { data: session, status } = useSession();
   const isCanfar = isCanfarMode();
 
-  console.log('🔍 useAuthStatus called:', { isCanfar, sessionStatus: status });
-
-  // For CANFAR mode, use existing auth status check
+ // For CANFAR mode, use existing auth status check
   const canfarAuthStatus = useQuery({
     queryKey: authKeys.status(),
     queryFn: () => {
-      console.log('📋 CANFAR mode - calling /api/auth/status (makes API call to /ac/whoami)');
       return canfarGetAuthStatus();
     },
     enabled: isCanfar,
@@ -118,11 +115,7 @@ export function useAuthStatus(
           }
         : { authenticated: false };
 
-    console.log('🔍 useAuthStatus returning (OIDC):', {
-      isLoading: status === 'loading',
-      isAuthenticated: oidcAuthStatus.authenticated,
-      username: oidcAuthStatus.user?.username,
-    });
+
 
     // Return in React Query format for compatibility
     return {
@@ -133,12 +126,6 @@ export function useAuthStatus(
       refetch: () => Promise.resolve({ data: oidcAuthStatus } as any),
     } as any;
   }
-
-  // CANFAR mode uses React Query
-  console.log('🔍 useAuthStatus returning (CANFAR):', {
-    isLoading: canfarAuthStatus.isLoading,
-    isAuthenticated: canfarAuthStatus.data?.authenticated,
-  });
 
   return canfarAuthStatus;
 }

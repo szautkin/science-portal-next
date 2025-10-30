@@ -172,19 +172,6 @@ export function AppBarWithAuth({
   const showAuthenticatedMenu = !isCheckingAuth && authStatus !== undefined && isAuthenticated;
   const showUnauthenticatedMenu = !isCheckingAuth && authStatus !== undefined && !isAuthenticated;
 
-  // Debug logging
-  console.log('AppBarWithAuth state:', {
-    isCheckingAuth,
-    isAuthenticated,
-    firstName,
-    lastName,
-    username,
-    displayName,
-    showAuthenticatedMenu,
-    showUnauthenticatedMenu,
-    authStatus,
-  });
-
   // Menu items shown when authenticated
   // CANFAR-specific items only show in CANFAR mode
   const authenticatedMenuItems = [
@@ -262,12 +249,6 @@ export function AppBarWithAuth({
     'Login'
   );
 
-  console.log('AppBarWithAuth rendering:', {
-    menuItemsLength: menuItemsToPass.length,
-    menuLabel: typeof menuLabelToShow === 'string' ? menuLabelToShow : 'CircularProgress',
-    isCheckingAuth,
-    showAuthenticatedMenu,
-  });
 
   return (
     <>
