@@ -28,7 +28,7 @@ interface RenewSessionParams {
  * POST /api/sessions/[id]/renew
  * Extend session expiry time
  *
- * According to SKAHA API docs: POST /v1/session/{sessionID}?action=renew
+ * According to SKAHA API docs: POST /v0/session/{sessionID}?action=renew
  * This sets the session expiry time based on the configured expiry time in skaha.sessionexpiry
  */
 export const POST = withErrorHandling(async (
@@ -49,9 +49,9 @@ export const POST = withErrorHandling(async (
 
   const authHeaders = await forwardAuthHeader(request);
 
-  // SKAHA API: POST /v1/session/{sessionID} with action=renew as form data
+  // SKAHA API: POST /v0/session/{sessionID} with action=renew as form data
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v1/session/${sessionId}`,
+    `${serverApiConfig.skaha.baseUrl}/v0/session/${sessionId}`,
     {
       method: 'POST',
       headers: {
@@ -86,7 +86,7 @@ export const POST = withErrorHandling(async (
 
     // Fetch the updated session details
     const sessionResponse = await fetchExternalApi(
-      `${serverApiConfig.skaha.baseUrl}/v1/session/${sessionId}`,
+      `${serverApiConfig.skaha.baseUrl}/v0/session/${sessionId}`,
       {
         method: 'GET',
         headers: {

@@ -33,20 +33,41 @@ function getSkahaBaseUrl(): string {
 
 /**
  * Get Storage API base URL based on auth mode
- * - OIDC mode: Uses SRC Cavern API (src.canfar.net/cavern/nodes/home/ - accepts SKA IAM tokens)
+ * - OIDC mode: Uses SRC Arc API (src.canfar.net/arc/nodes/home/ - accepts SKA IAM tokens)
  * - CANFAR mode: Uses SERVICE_STORAGE_API (standard CANFAR storage)
  */
 function getStorageBaseUrl(): string {
   if (isOIDCMode()) {
-    // OIDC mode: Use SRC Cavern API that accepts SKA IAM tokens
-    const srcCavernApi = process.env.NEXT_PUBLIC_SRC_CAVERN_API || process.env.SRC_CAVERN_API || 'https://src.canfar.net/cavern/nodes/home/';
-    console.log('🔍 Server config - OIDC mode, using SRC Cavern API:', srcCavernApi);
-    return srcCavernApi;
+    // OIDC mode: Use SRC Arc API that accepts SKA IAM tokens
+    const srcArcApi = process.env.NEXT_PUBLIC_SRC_ARC_API || process.env.SRC_ARC_API || 'https://src.canfar.net/arc/nodes/home/';
+    console.log('🔍 Server config - OIDC mode, using SRC Arc API:', srcArcApi);
+    return srcArcApi;
   } else {
     // CANFAR mode: Use standard CANFAR storage API
     const canfarStorageApi = process.env.SERVICE_STORAGE_API || process.env.NEXT_PUBLIC_SERVICE_STORAGE_API;
     console.log('🔍 Server config - CANFAR mode, using CANFAR Storage API:', canfarStorageApi);
     return canfarStorageApi || '';
+  }
+}
+
+/**
+ * Get VOSpace API base URL based on auth mode
+ * - OIDC mode: Uses SRC Arc API (src.canfar.net/arc - accepts SKA IAM tokens)
+ * - CANFAR mode: Uses VOSPACE_API or default CANFAR Arc endpoint
+ */
+function getVOSpaceBaseUrl(): string {
+  if (isOIDCMode()) {
+    // OIDC mode: Use SRC Arc API that accepts SKA IAM tokens
+    const srcArcApi = process.env.NEXT_PUBLIC_SRC_ARC_API || process.env.SRC_ARC_API || 'https://src.canfar.net/arc';
+    // Remove trailing /nodes/home/ if present
+    const cleanUrl = srcArcApi.replace(/\/nodes\/home\/?$/, '');
+    console.log('🔍 Server config - OIDC mode, using SRC VOSpace API:', cleanUrl);
+    return cleanUrl;
+  } else {
+    // CANFAR mode: Use standard CANFAR VOSpace API
+    const canfarVOSpaceApi = process.env.VOSPACE_API || process.env.NEXT_PUBLIC_VOSPACE_API || 'https://ws-uv.canfar.net/arc';
+    console.log('🔍 Server config - CANFAR mode, using CANFAR VOSpace API:', canfarVOSpaceApi);
+    return canfarVOSpaceApi;
   }
 }
 
@@ -86,6 +107,10 @@ export const serverApiConfig = {
   },
   skaha: {
     baseUrl: getSkahaBaseUrl(),
+    timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
+  },
+  vospace: {
+    baseUrl: getVOSpaceBaseUrl(),
     timeout: parseInt(process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
   },
 } as const;

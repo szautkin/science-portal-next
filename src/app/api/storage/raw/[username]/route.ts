@@ -64,7 +64,7 @@ export const GET = withErrorHandling(async (
   }
 
   const authHeaders = await forwardAuthHeader(request);
-  // Use mode-aware storage API (SRC Cavern for OIDC, CANFAR for CANFAR mode)
+  // Use mode-aware storage API (SRC Arc for OIDC, CANFAR for CANFAR mode)
   const storageBaseUrl = serverApiConfig.storage.baseUrl;
   // Base URL already includes path, just append username
   const storageUrl = `${storageBaseUrl}${username}`;

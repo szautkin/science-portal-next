@@ -7,6 +7,8 @@ import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/Acti
 import { UserStorageWidget } from '@/app/components/UserStorageWidget/UserStorageWidget';
 import { LaunchFormWidget } from '@/app/components/LaunchFormWidget/LaunchFormWidget';
 import { PlatformLoad } from '@/app/components/PlatformLoad/PlatformLoad';
+import { VOSpaceStorageWidget } from '@/app/components/VOSpaceStorageWidget/VOSpaceStorageWidget';
+import { StarAIWidget } from '@/app/components/StarAIWidget/StarAIWidget';
 import { Footer } from '@/app/components/Footer/Footer';
 import { Box } from '@/app/components/Box/Box';
 import { Container } from '@mui/material';
@@ -249,6 +251,7 @@ export default function SciencePortalPage() {
   const isLoadingPlatform = !isAuthenticated || isPlatformLoading || isPlatformFetching;
   const isLoadingLaunchForm = !isAuthenticated || isLoadingImages || isLoadingRepositories || isLoadingContext || isFetchingImages || isFetchingRepositories || isFetchingContext;
   const isLoadingUserStorage = !isAuthenticated;
+  const isLoadingVOSpace = !isAuthenticated;
 
   // Create stable handlers using useCallback
   const handleDeleteSession = useCallback((sessionId: string) => {
@@ -310,6 +313,13 @@ export default function SciencePortalPage() {
     refetchRepositories();
     refetchContext();
   }, [refetchImages, refetchRepositories, refetchContext]);
+
+  // Handle refresh for VOSpace Storage Widget
+  const handleVOSpaceRefresh = useCallback(() => {
+    // VOSpace widget manages its own query invalidation
+    // This callback is provided for potential future use
+    console.log('VOSpace refresh requested');
+  }, []);
 
   // Provide placeholder data for Platform Load when data is not yet loaded
   const platformLoadDataOrPlaceholder: PlatformLoadData = useMemo(() => {
@@ -467,6 +477,33 @@ export default function SciencePortalPage() {
               />
             </Box>
           </Box>
+        </Container>
+
+        {/* VOSpace Storage Widget - Full width */}
+        <Container maxWidth="xl" sx={{ mb: 4, px: { xs: 2, sm: 3 } }}>
+          <VOSpaceStorageWidget
+            title="VO Space Storage"
+            isAuthenticated={isAuthenticated}
+            username={authStatus?.user?.username || ''}
+            initialPath={authStatus?.user?.username ? `home/${authStatus.user.username}` : 'home'}
+            isLoading={isLoadingVOSpace}
+            onRefresh={handleVOSpaceRefresh}
+            showRefreshButton={true}
+          />
+        </Container>
+
+        {/* Star AI Widget - Full width */}
+        <Container maxWidth="xl" sx={{ mb: 4, px: { xs: 2, sm: 3 } }}>
+          <StarAIWidget
+            title="Star AI"
+            isAuthenticated={isAuthenticated}
+            username={authStatus?.user?.username || ''}
+            initialPath={authStatus?.user?.username ? `home/${authStatus.user.username}` : 'home'}
+            onRefresh={handleVOSpaceRefresh}
+            showRefreshButton={true}
+            onFolderCreated={handleVOSpaceRefresh}
+            onFileCreated={handleVOSpaceRefresh}
+          />
         </Container>
       </Box>
 

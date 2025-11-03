@@ -1,9 +1,8 @@
 /**
- * Sessions API Routes
+ * Headless Sessions API Route
  *
- * Handles listing all sessions and launching new sessions.
- * GET - List all active sessions
- * POST - Launch a new session
+ * Handles launching headless (batch) sessions via Skaha v0 API.
+ * Headless sessions use v0 endpoint while contributed sessions use v1.
  */
 
 import { NextRequest } from 'next/server';
@@ -19,59 +18,15 @@ import {
 } from '@/app/api/lib/api-utils';
 import { serverApiConfig } from '@/app/api/lib/server-config';
 import { createLogger } from '@/app/api/lib/logger';
-import type { SkahaSessionResponse, SessionLaunchParams } from '@/lib/api/skaha';
+import type { SessionLaunchParams } from '@/lib/api/skaha';
 import { HTTP_STATUS } from '@/app/api/lib/http-constants';
 
 /**
- * GET /api/sessions
- * List all active sessions for the current user
- */
-export const GET = withErrorHandling(async (request: NextRequest) => {
-  const logger = createLogger('/api/sessions', 'GET');
-  logger.logRequest(request);
-
-  if (!validateMethod(request, ['GET'])) {
-    return methodNotAllowed(['GET']);
-  }
-
-  const authHeaders = await forwardAuthHeader(request);
-  console.log('📨 Session GET route - authHeaders received:', authHeaders);
-
-  const finalHeaders = {
-    ...authHeaders,
-    'Accept': 'application/json',
-  };
-  console.log('📨 Session GET route - final headers:', finalHeaders);
-
-  const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v0/session`,
-    {
-      method: 'GET',
-      headers: finalHeaders,
-    },
-    serverApiConfig.skaha.timeout
-  );
-
-  if (!response.ok) {
-    logger.logError(response.status, `Failed to fetch sessions: ${response.statusText}`);
-    return errorResponse(
-      'Failed to fetch sessions',
-      response.status
-    );
-  }
-
-  const sessions: SkahaSessionResponse[] = await response.json();
-  logger.info(`Retrieved ${sessions.length} session(s)`);
-  logger.logSuccess(HTTP_STATUS.OK, { count: sessions.length });
-  return successResponse(sessions);
-});
-
-/**
- * POST /api/sessions
- * Launch a new session
+ * POST /api/sessions/headless
+ * Launch a new headless (batch) session using Skaha v0 API
  */
 export const POST = withErrorHandling(async (request: NextRequest) => {
-  const logger = createLogger('/api/sessions', 'POST');
+  const logger = createLogger('/api/sessions/headless', 'POST');
 
   if (!validateMethod(request, ['POST'])) {
     return methodNotAllowed(['POST']);
@@ -89,18 +44,22 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     );
   }
 
+  // Validate that this is a headless session
+  if (body.sessionType !== 'headless') {
+    logger.logError(HTTP_STATUS.BAD_REQUEST, `Invalid session type for headless endpoint: ${body.sessionType}`);
+    return errorResponse(
+      'This endpoint only supports headless sessions. Use /api/sessions for other session types.',
+      HTTP_STATUS.BAD_REQUEST
+    );
+  }
+
   // Build form data for SKAHA API
   const formData = new URLSearchParams();
   formData.append('name', body.sessionName);
   formData.append('image', body.containerImage);
 
-  // Add session type parameter
-  // Headless sessions use 'kind' parameter, contributed sessions use 'type'
-  if (body.sessionType === 'headless') {
-    formData.append('kind', 'headless');
-  } else if (body.sessionType) {
-    formData.append('type', body.sessionType);
-  }
+  // Headless sessions use 'kind' parameter
+  formData.append('kind', 'headless');
 
   // Add cores if provided
   if (body.cores) {
@@ -144,15 +103,16 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     'Accept': 'application/json',
   };
 
-  // Add registry authentication header if credentials are provided (for Advanced tab)
+  // Add registry authentication header if credentials are provided
   if (body.registryUsername && body.registrySecret) {
     const registryAuth = Buffer.from(`${body.registryUsername}:${body.registrySecret}`).toString('base64');
     (headers as Record<string, string>)['x-skaha-registry-auth'] = registryAuth;
     logger.info(`Including registry auth for user: ${body.registryUsername}`);
   }
 
-  logger.info(`Launching session: ${body.sessionName} with image: ${body.containerImage}`);
+  logger.info(`Launching headless session: ${body.sessionName} with image: ${body.containerImage}`);
 
+  // Use Skaha v0 API for headless sessions
   const response = await fetchExternalApi(
     `${serverApiConfig.skaha.baseUrl}/v0/session`,
     {
@@ -165,22 +125,22 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   if (!response.ok) {
     const errorText = await response.text();
-    logger.logError(response.status, `Failed to launch session: ${response.statusText}`, errorText);
+    logger.logError(response.status, `Failed to launch headless session: ${response.statusText}`, errorText);
 
     // Parse and format error message for better user experience
-    let userMessage = 'Failed to launch session';
+    let userMessage = 'Failed to launch headless session';
     if (errorText) {
       // Remove extra newlines and whitespace
       const cleanedError = errorText.trim().replace(/\n+/g, ' ');
 
       // Check for specific error patterns
       if (cleanedError.includes('No authentication provided for unknown or private image')) {
-        userMessage = 'This image requires authentication. Please provide registry username and password in the Advanced tab.';
+        userMessage = 'This image requires authentication. Please provide registry username and password.';
       } else if (cleanedError.includes('authentication') || cleanedError.includes('unauthorized')) {
         userMessage = 'Authentication failed. Please check your registry credentials.';
       } else {
         // Use the error text if it's not too long
-        userMessage = cleanedError.length > 200 ? 'Failed to launch session. Please check your configuration.' : cleanedError;
+        userMessage = cleanedError.length > 200 ? 'Failed to launch headless session. Please check your configuration.' : cleanedError;
       }
     }
 
@@ -193,7 +153,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   // SKAHA returns the session ID in the response body as text
   const sessionId = (await response.text()).trim();
-  logger.info(`Successfully launched session: ${body.sessionName}, ID: ${sessionId}`);
+  logger.info(`Successfully launched headless session: ${body.sessionName}, ID: ${sessionId}`);
   logger.logSuccess(HTTP_STATUS.CREATED, { sessionId, sessionName: body.sessionName });
 
   // Return the session ID and basic info

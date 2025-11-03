@@ -56,7 +56,7 @@ export interface Session {
   requestedGPU?: string;
 }
 
-// SKAHA Stats API Response - raw format from /v1/session?view=stats
+// SKAHA Stats API Response - raw format from /v0/session?view=stats
 export interface SkahaStatsResponse {
   instances: {
     session: number;
@@ -150,7 +150,8 @@ export interface SessionLaunchParams {
   ram?: number; // Optional - only for fixed resources
   gpus?: number; // Optional - only for fixed resources
   env?: Record<string, string>;
-  cmd?: string;
+  cmd?: string; // Single command string (deprecated, use cmdArgs for headless)
+  cmdArgs?: string[]; // Command arguments array for headless sessions
   // Registry authentication for private/unknown images (Advanced tab)
   registryUsername?: string;
   registrySecret?: string;
