@@ -31,6 +31,7 @@ export const PromptTextareaImpl = React.forwardRef<
       disabled = false,
       value,
       onChange,
+      modelInfo,
       ...props
     },
     ref
@@ -192,22 +193,42 @@ export const PromptTextareaImpl = React.forwardRef<
             </FormHelperText>
           )}
 
-          {showCharCount && maxLength && (
-            <Typography
-              variant="caption"
-              sx={(theme) => ({
-                fontFamily: theme.typography.fontFamily,
-                color:
-                  charCount > maxLength * 0.9
-                    ? theme.palette.warning.main
-                    : theme.palette.text.secondary,
-                marginLeft: theme.spacing(1),
-                flexShrink: 0,
-              })}
-            >
-              {charCount}/{maxLength}
-            </Typography>
-          )}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              flexShrink: 0,
+            }}
+          >
+            {modelInfo && (
+              <Typography
+                variant="caption"
+                sx={(theme) => ({
+                  fontFamily: theme.typography.fontFamily,
+                  color: theme.palette.text.secondary,
+                  fontWeight: theme.typography.fontWeightMedium,
+                })}
+              >
+                {modelInfo.vendor} • {modelInfo.modelName}
+              </Typography>
+            )}
+
+            {showCharCount && maxLength && (
+              <Typography
+                variant="caption"
+                sx={(theme) => ({
+                  fontFamily: theme.typography.fontFamily,
+                  color:
+                    charCount > maxLength * 0.9
+                      ? theme.palette.warning.main
+                      : theme.palette.text.secondary,
+                })}
+              >
+                {charCount}/{maxLength}
+              </Typography>
+            )}
+          </Box>
         </Box>
       </FormControl>
     );

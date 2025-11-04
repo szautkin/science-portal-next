@@ -24,4 +24,9 @@ export interface PromptTextareaProps
   maxLength?: number;
   /** Show character count */
   showCharCount?: boolean;
+  /** Show model information (vendor and model name) */
+  modelInfo?: {
+    vendor: string;
+    modelName: string;
+  };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Paper,
   Typography,
@@ -75,13 +75,29 @@ export const ResponseViewerImpl = React.forwardRef<
       }
     }, [content, onDownload]);
 
-    const handleFullscreen = () => {
-      setIsFullscreen(!isFullscreen);
-    };
+    const handleFullscreen = useCallback(() => {
+      setIsFullscreen((prev) => !prev);
+    }, []);
 
     const handleCloseCopySnackbar = () => {
       setCopySuccess(false);
     };
+
+    // Handle ESC key to exit fullscreen
+    useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape' && isFullscreen) {
+          setIsFullscreen(false);
+        }
+      };
+
+      if (isFullscreen) {
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+        };
+      }
+    }, [isFullscreen]);
 
     const renderContent = () => {
       if (loading) {
@@ -172,6 +188,61 @@ export const ResponseViewerImpl = React.forwardRef<
               backgroundColor: 'action.hover',
               fontWeight: 'bold',
             },
+            '@media print': {
+              padding: '0 !important',
+              fontSize: '12px !important',
+              lineHeight: '1.6 !important',
+              color: '#000000 !important',
+              '& img': {
+                maxWidth: '100% !important',
+                pageBreakInside: 'avoid',
+              },
+              '& pre': {
+                backgroundColor: '#f5f5f5 !important',
+                border: '1px solid #e0e0e0 !important',
+                padding: '8px !important',
+                fontSize: '11px !important',
+                pageBreakInside: 'avoid',
+                whiteSpace: 'pre-wrap !important',
+              },
+              '& code': {
+                backgroundColor: '#f5f5f5 !important',
+                padding: '2px 4px !important',
+                fontSize: '11px !important',
+                color: '#000000 !important',
+              },
+              '& table': {
+                fontSize: '11px !important',
+                pageBreakInside: 'avoid',
+                marginTop: '8px !important',
+                marginBottom: '8px !important',
+              },
+              '& th, & td': {
+                border: '1px solid #000000 !important',
+                padding: '6px !important',
+                color: '#000000 !important',
+              },
+              '& th': {
+                backgroundColor: '#e0e0e0 !important',
+                fontWeight: 'bold !important',
+              },
+              '& h1, & h2, & h3, & h4, & h5, & h6': {
+                color: '#000000 !important',
+                pageBreakAfter: 'avoid',
+              },
+              '& p': {
+                color: '#000000 !important',
+                marginBottom: '8px !important',
+              },
+              '& ul, & ol': {
+                color: '#000000 !important',
+                marginLeft: '20px !important',
+              },
+              '& a': {
+                color: '#000000 !important',
+                textDecoration: 'underline !important',
+              },
+            },
           }}
           dangerouslySetInnerHTML={{ __html: content }}
         />
@@ -213,51 +284,97 @@ export const ResponseViewerImpl = React.forwardRef<
               backgroundColor: theme.palette.action.hover,
               borderBottom: `1px solid ${theme.palette.divider}`,
               minHeight: '48px !important',
+              ...(isFullscreen && {
+                backgroundColor: theme.palette.background.paper,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                position: 'sticky',
+                top: 0,
+                zIndex: theme.zIndex.appBar,
+              }),
+              '@media print': {
+                backgroundColor: 'transparent !important',
+                borderBottom: 'none !important',
+                minHeight: 'auto !important',
+                padding: '0 !important',
+                marginBottom: '12px !important',
+              },
             })}
           >
             <Typography
               variant="h6"
               component="h2"
-              sx={{ flexGrow: 1, fontSize: '1rem', fontWeight: 600 }}
+              sx={{
+                flexGrow: 1,
+                fontSize: '1rem',
+                fontWeight: 600,
+                '@media print': {
+                  fontSize: '16px !important',
+                  fontWeight: 700,
+                  color: '#000000 !important',
+                  marginBottom: '8px !important',
+                },
+              }}
             >
               {title}
             </Typography>
 
-            {showCopyButton && content && (
-              <Tooltip title="Copy to clipboard">
-                <IconButton
-                  size="small"
-                  onClick={handleCopy}
-                  disabled={loading}
-                  sx={{ marginRight: 0.5 }}
-                >
-                  <ContentCopy fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 0.5,
+                '@media print': {
+                  display: 'none !important',
+                },
+              }}
+            >
+              {showCopyButton && content && (
+                <Tooltip title="Copy to clipboard">
+                  <IconButton
+                    size="small"
+                    onClick={handleCopy}
+                    disabled={loading}
+                  >
+                    <ContentCopy fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
 
-            {showDownloadButton && content && (
-              <Tooltip title="Download as HTML">
-                <IconButton
-                  size="small"
-                  onClick={handleDownload}
-                  disabled={loading}
-                  sx={{ marginRight: 0.5 }}
-                >
-                  <Download fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
+              {showDownloadButton && content && (
+                <Tooltip title="Download as HTML">
+                  <IconButton
+                    size="small"
+                    onClick={handleDownload}
+                    disabled={loading}
+                  >
+                    <Download fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
 
-            <Tooltip title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-              <IconButton size="small" onClick={handleFullscreen}>
-                {isFullscreen ? (
-                  <FullscreenExit fontSize="small" />
-                ) : (
-                  <Fullscreen fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
+              <Tooltip title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Fullscreen'}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={handleFullscreen}
+                    sx={(theme) => ({
+                      ...(isFullscreen && {
+                        backgroundColor: theme.palette.primary.main,
+                        color: theme.palette.primary.contrastText,
+                        '&:hover': {
+                          backgroundColor: theme.palette.primary.dark,
+                        },
+                      }),
+                    })}
+                  >
+                    {isFullscreen ? (
+                      <FullscreenExit fontSize="small" />
+                    ) : (
+                      <Fullscreen fontSize="small" />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
           </Toolbar>
 
           <Box
