@@ -312,14 +312,18 @@ export const StarAIWidgetImpl = React.forwardRef<
           normalizedScriptPath = `/arc/${normalizedScriptPath}`;
         }
 
-        // Build command arguments as an array
-        // The startup.sh is the ENTRYPOINT, so we pass arguments as array items
-        // The startup.sh expects: $1=sessionId, $2=scriptPath, $3=callback(optional)
-        const cmdArgs = [sessionId, normalizedScriptPath];
+        // Build environment variables for python-runner
+        // The updated startup.sh accepts parameters via env vars (more reliable than cmd args)
+        const envVars: Record<string, string> = {
+          PYTHONUNBUFFERED: '1',
+          PYTHONDONTWRITEBYTECODE: '1',
+          PYTHON_RUNNER_SESSION_ID: sessionId,
+          PYTHON_RUNNER_SCRIPT_PATH: normalizedScriptPath,
+        };
 
         // Add callback endpoint if provided
         if (callbackEndpoint.trim()) {
-          cmdArgs.push(callbackEndpoint.trim());
+          envVars.PYTHON_RUNNER_CALLBACK_ENDPOINT = callbackEndpoint.trim();
         }
 
         // Construct full image path
@@ -342,11 +346,7 @@ export const StarAIWidgetImpl = React.forwardRef<
             cores: pythonCores,
             ram: pythonRam,
             gpus: 0,
-            cmdArgs: cmdArgs,
-            env: {
-              PYTHONUNBUFFERED: '1',
-              PYTHONDONTWRITEBYTECODE: '1',
-            },
+            env: envVars,
             registryUsername: registryUsername || undefined,
             registrySecret: registrySecret || undefined,
           }),
