@@ -9,8 +9,6 @@ export interface ConversationHistoryProps {
   onTabChange: (index: number) => void;
   /** Close tab handler */
   onCloseTab: (index: number) => void;
-  /** Load code from conversation handler */
-  onLoadCode?: (code: string, language: string) => void;
   /** Maximum height of conversation area */
   maxHeight?: string | number;
   /** Show empty state */

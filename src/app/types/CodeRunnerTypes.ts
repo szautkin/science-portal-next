@@ -60,6 +60,26 @@ export interface ConversationItem {
 }
 
 /**
+ * Code snippet displayed in the left panel
+ */
+export interface CodeSnippet {
+  /** Unique identifier */
+  id: string;
+  /** The code content */
+  code: string;
+  /** Programming language */
+  language: CodeLanguage;
+  /** Brief description/title */
+  title?: string;
+  /** When it was generated */
+  timestamp: Date;
+  /** AI model that generated it */
+  modelName: string;
+  /** Whether the snippet is collapsed */
+  collapsed?: boolean;
+}
+
+/**
  * Code execution result
  */
 export interface ExecutionResult {

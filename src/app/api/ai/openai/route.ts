@@ -77,18 +77,37 @@ export async function POST(request: NextRequest) {
     let completion: OpenAI.Chat.ChatCompletion;
 
     try {
-      completion = await openai.chat.completions.create(
-        {
-          model: modelName,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-          stream: false,
-        },
-        {
-          signal: controller.signal,
-        }
-      );
+      // Determine which parameters to use based on model family
+      // O1 series (o1-preview, o1-mini, o3-mini): use max_completion_tokens, NO temperature support
+      // GPT-5 series (gpt-5, gpt-5-mini, gpt-5-nano): use max_completion_tokens, YES temperature support
+      // Traditional models (gpt-4, gpt-4o, gpt-3.5): use max_tokens, YES temperature support
+
+      const isO1Model = modelName.startsWith('o1-') || modelName.startsWith('o3-') || modelName.includes('o1');
+      const isGPT5Model = modelName.startsWith('gpt-5');
+      const usesMaxCompletionTokens = isO1Model || isGPT5Model;
+
+      const requestParams: OpenAI.Chat.ChatCompletionCreateParams = {
+        model: modelName,
+        messages,
+        stream: false,
+      };
+
+      // Add temperature only for models that support it (GPT-5 and traditional models, NOT o1)
+      if (!isO1Model) {
+        requestParams.temperature = temperature;
+      }
+
+      // Add the appropriate token limit parameter
+      if (usesMaxCompletionTokens) {
+        // max_completion_tokens is used for o1/o3/gpt-5 models instead of max_tokens
+        (requestParams as any).max_completion_tokens = maxTokens;
+      } else {
+        requestParams.max_tokens = maxTokens;
+      }
+
+      completion = await openai.chat.completions.create(requestParams, {
+        signal: controller.signal,
+      });
     } finally {
       clearTimeout(timeoutId);
     }

@@ -14,6 +14,9 @@ import {
   Button,
   Tooltip,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
+  FormGroup,
 } from '@mui/material';
 import { Settings as SettingsIcon, Send as SendIcon } from '@mui/icons-material';
 import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
@@ -23,6 +26,7 @@ import { ConfigPopover } from '@/app/components/ConfigPopover/ConfigPopover';
 import { CodeEditor } from '@/app/components/CodeEditor/CodeEditor';
 import { ExecutionResults } from '@/app/components/ExecutionResults/ExecutionResults';
 import { ConversationHistory } from '@/app/components/ConversationHistory/ConversationHistory';
+import { CodeSnippetsList } from '@/app/components/CodeSnippetsList';
 import { AIConfigProvider, useAIConfig } from '@/app/context/AIConfigContext';
 import { CodeRunnerProvider, useCodeRunner } from '@/app/context/CodeRunnerContext';
 import { useCodeExecution } from '@/lib/hooks/useCodeExecution';
@@ -31,8 +35,10 @@ import { useCreateFile, useCreateFolder } from '@/lib/hooks/useVOSpace';
 import { useAuthStatus } from '@/lib/hooks/useAuth';
 import { getAuthHeader } from '@/lib/auth/token-storage';
 import { appBarWithUserMenu, CanfarLogo, SRCNetLogo } from '@/stories/shared/navigation';
+import { STARAI_SYSTEM_PROMPT } from '@/lib/prompts/starai-system-prompt';
 import {
   ConversationItem,
+  CodeSnippet,
   CodeLanguage,
   FILE_EXTENSIONS,
   CONTENT_TYPES,
@@ -88,6 +94,43 @@ const StarAIRunnerInterface: React.FC = () => {
   const [executionStartTime, setExecutionStartTime] = useState<Date | null>(null);
   const [resultsFileContent, setResultsFileContent] = useState<string>('');
   const [isLoadingResults, setIsLoadingResults] = useState(false);
+
+  // Context inclusion state (default to true)
+  const [includeCode, setIncludeCode] = useState(true);
+  const [includeLogs, setIncludeLogs] = useState(true);
+  const [includeResults, setIncludeResults] = useState(true);
+  const [includeConversation, setIncludeConversation] = useState(true);
+
+  // Code snippets state - displayed in LEFT panel
+  const [codeSnippets, setCodeSnippets] = useState<CodeSnippet[]>([]);
+  const [selectedSnippetId, setSelectedSnippetId] = useState<string | null>(null);
+
+  // Code snippets handlers
+  const handleToggleCollapse = useCallback((id: string) => {
+    setCodeSnippets(prev =>
+      prev.map(snippet =>
+        snippet.id === id ? { ...snippet, collapsed: !snippet.collapsed } : snippet
+      )
+    );
+  }, []);
+
+  const handleDeleteSnippet = useCallback((id: string) => {
+    setCodeSnippets(prev => prev.filter(snippet => snippet.id !== id));
+    if (selectedSnippetId === id) {
+      setSelectedSnippetId(null);
+    }
+  }, [selectedSnippetId]);
+
+  const handleLoadSnippet = useCallback(() => {
+    if (!selectedSnippetId) return;
+    const snippet = codeSnippets.find(s => s.id === selectedSnippetId);
+    if (snippet) {
+      setCurrentCode(snippet.code);
+      setCodeLanguage(snippet.language);
+      setIsCodeModified(false);
+      setStorageInfo(null); // Reset storage info since this is a new code
+    }
+  }, [selectedSnippetId, codeSnippets, setCurrentCode, setCodeLanguage, setIsCodeModified, setStorageInfo]);
 
   // Hooks
   const { launchSession, cancelExecution: cancelExecutionHook } = useCodeExecution({
@@ -192,29 +235,117 @@ const StarAIRunnerInterface: React.FC = () => {
   }, [prompt, apiKey, selectedModel]);
 
   /**
-   * Extract code from response
+   * Extract ALL code blocks from response
    */
-  const extractCode = useCallback((response: string): { code: string; language: CodeLanguage } | null => {
-    // Look for code blocks with language specifier
+  const extractAllCode = useCallback((response: string): Array<{ code: string; language: CodeLanguage }> => {
     const codeBlockRegex = /```(\w+)\n([\s\S]*?)```/g;
     const matches = Array.from(response.matchAll(codeBlockRegex));
+    const codeBlocks: Array<{ code: string; language: CodeLanguage }> = [];
 
-    if (matches.length > 0) {
-      const [, language, code] = matches[0];
+    for (const match of matches) {
+      const [, language, code] = match;
       const normalizedLang = language.toLowerCase();
 
       // Map to supported languages
+      let mappedLang: CodeLanguage | null = null;
       if (normalizedLang === 'python' || normalizedLang === 'py') {
-        return { code: code.trim(), language: 'python' };
+        mappedLang = 'python';
       } else if (normalizedLang === 'javascript' || normalizedLang === 'js') {
-        return { code: code.trim(), language: 'javascript' };
+        mappedLang = 'javascript';
       } else if (normalizedLang === 'bash' || normalizedLang === 'sh' || normalizedLang === 'shell') {
-        return { code: code.trim(), language: 'bash' };
+        mappedLang = 'bash';
+      }
+
+      if (mappedLang) {
+        codeBlocks.push({ code: code.trim(), language: mappedLang });
       }
     }
 
-    return null;
+    return codeBlocks;
   }, []);
+
+  /**
+   * Strip code blocks from text, leaving only explanatory text
+   */
+  const stripCodeBlocks = useCallback((text: string): string => {
+    return text.replace(/```(\w+)\n[\s\S]*?```/g, '').trim();
+  }, []);
+
+  /**
+   * Build context-enriched prompt
+   */
+  const buildContextualPrompt = useCallback((userPrompt: string) => {
+    let contextualPrompt = userPrompt.trim();
+
+    // Add context sections if selected
+    const contextSections: string[] = [];
+
+    // Include conversation history (last 10 messages max to avoid token limits)
+    if (includeConversation && conversations.length > 0) {
+      const recentConversations = conversations.slice(-10);
+      const conversationText = recentConversations
+        .map((conv) => {
+          const parts: string[] = [];
+          if (conv.prompt) {
+            parts.push(`User: ${conv.prompt}`);
+          }
+          if (conv.response) {
+            // Strip HTML tags for cleaner context
+            const cleanResponse = conv.response.replace(/<[^>]*>/g, '');
+            parts.push(`Assistant: ${cleanResponse}`);
+          }
+          return parts.join('\n');
+        })
+        .join('\n\n');
+
+      if (conversationText) {
+        contextSections.push(`
+### Conversation History
+${conversationText}
+`);
+      }
+    }
+
+    if (includeCode && currentCode.trim()) {
+      contextSections.push(`
+### Current Code (${codeLanguage})
+\`\`\`${codeLanguage}
+${currentCode}
+\`\`\`
+`);
+    }
+
+    if (includeLogs && executionResults.trim()) {
+      contextSections.push(`
+### Execution Logs
+\`\`\`
+${executionResults}
+\`\`\`
+`);
+    }
+
+    if (includeResults && resultsFileContent.trim()) {
+      contextSections.push(`
+### Results File Content
+\`\`\`
+${resultsFileContent}
+\`\`\`
+`);
+    }
+
+    // Build final prompt with context
+    if (contextSections.length > 0) {
+      contextualPrompt = `${contextualPrompt}
+
+---
+
+**Context provided:**
+
+${contextSections.join('\n')}`;
+    }
+
+    return contextualPrompt;
+  }, [includeConversation, includeCode, includeLogs, includeResults, conversations, currentCode, codeLanguage, executionResults, resultsFileContent]);
 
   /**
    * Handle prompt submission
@@ -224,6 +355,27 @@ const StarAIRunnerInterface: React.FC = () => {
 
     setIsSubmitting(true);
     setFormError('');
+
+    const userPrompt = prompt.trim();
+
+    // Build the contextual prompt with user's input
+    const contextualPrompt = buildContextualPrompt(userPrompt);
+
+    // Immediately show user's message in conversation
+    const userMessageId = Date.now().toString();
+    const userMessage: ConversationItem = {
+      id: userMessageId,
+      prompt: userPrompt,
+      response: '', // Empty for now
+      responseType: 'text',
+      timestamp: new Date(),
+      model: selectedModel,
+      modelName: selectedModelName,
+    };
+    addConversation(userMessage);
+
+    // Clear prompt immediately after adding to conversation
+    setPrompt('');
 
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), 420000); // 7 minutes
@@ -235,143 +387,10 @@ const StarAIRunnerInterface: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: prompt.trim(),
+          prompt: contextualPrompt,
           apiKey,
           modelName: selectedModelName,
-          systemPrompt: `You are a helpful coding assistant for the CANFAR Science Portal. When generating code:
-
-1. Always wrap code in markdown code blocks with the appropriate language identifier (\`\`\`python, \`\`\`javascript, \`\`\`bash, etc.)
-
-2. CRITICAL LOGGING REQUIREMENTS - ALL code must include:
-   - Print statements at the START: "Starting execution..." with script name
-   - Print statements for EACH major step: "Step 1: Loading data...", "Step 2: Processing...", etc.
-   - Print statements showing progress: "Processed 100 items...", "Analysis 50% complete..."
-   - Print any warnings, errors, or important values
-   - Print statement at the END: "Execution completed successfully" or "Execution failed: [reason]"
-   - These logs are ESSENTIAL for monitoring execution progress
-
-3. CRITICAL FILE OUTPUT REQUIREMENTS:
-   - ALWAYS save results to a file with predictable naming: script_XXXXX_results.txt
-   - Use the SAME directory as the script (use os.path.dirname(os.path.abspath(__file__)))
-   - Write ALL analysis results, findings, and conclusions to this file
-   - Print the FULL PATH where results were saved
-   - Example Python pattern:
-     \`\`\`python
-     import os
-     import sys
-
-     print("=" * 60)
-     print("Starting execution:", __file__)
-     print("=" * 60)
-
-     try:
-         # Step 1: Setup
-         print("Step 1: Initializing...")
-         script_dir = os.path.dirname(os.path.abspath(__file__))
-         script_filename = os.path.basename(__file__)
-         # Remove extension (.py, .js, .sh, etc.)
-         script_name = os.path.splitext(script_filename)[0]
-         output_file = os.path.join(script_dir, f"{script_name}_results.txt")
-         print(f"Script: {__file__}")
-         print(f"Script directory: {script_dir}")
-         print(f"Script name (no ext): {script_name}")
-         print(f"Output will be saved to: {output_file}")
-
-         # Step 2: Your analysis code
-         print("Step 2: Running analysis...")
-         results = "Your analysis results here"
-         print("Analysis complete")
-
-         # Step 3: Save results
-         print("Step 3: Saving results...")
-         with open(output_file, 'w') as f:
-             f.write("=" * 60 + "\\n")
-             f.write("ANALYSIS RESULTS\\n")
-             f.write("=" * 60 + "\\n\\n")
-             f.write(results)
-             f.write("\\n\\n" + "=" * 60 + "\\n")
-             f.write("END OF RESULTS\\n")
-             f.write("=" * 60 + "\\n")
-
-         print(f"✓ Results successfully saved to: {output_file}")
-         print("=" * 60)
-         print("Execution completed successfully")
-         print("=" * 60)
-
-     except Exception as e:
-         print("=" * 60)
-         print(f"ERROR: Execution failed: {e}")
-         print("=" * 60)
-         sys.exit(1)
-     \`\`\`
-
-4. For astronomy/data analysis tasks:
-   - Log each data loading step
-   - Print summary statistics as they're calculated
-   - Log any plot/figure generation
-   - Include all findings in the results file
-
-5. Available packages in the image:
-   - Astronomy: astropy, astroquery, photutils (>=1.10), specutils, reproject, regions
-   - Data Science: numpy, scipy, pandas, matplotlib, scikit-learn, scikit-image
-   - FITS: fitsio, h5py
-   - CANFAR platform tools via 'canfar' package
-
-6. IMPORTANT: Use correct imports for photutils (version 1.10+):
-   \`\`\`python
-   # Correct imports for photutils >= 1.10
-   from photutils.detection import DAOStarFinder, IRAFStarFinder
-   from photutils.aperture import CircularAperture, CircularAnnulus, aperture_photometry
-   from photutils.background import Background2D, MedianBackground
-   from photutils.segmentation import detect_sources, deblend_sources
-
-   # Other common imports
-   from astropy.io import fits
-   from astropy.stats import sigma_clipped_stats, SigmaClip
-   from astropy.wcs import WCS
-   from astropy.coordinates import SkyCoord
-   from astropy import units as u
-   \`\`\`
-
-7. CRITICAL: FITS file handling best practices:
-   \`\`\`python
-   # When opening FITS files, always inspect all HDUs
-   # Data might be in HDU[0] (primary) or HDU[1] (first extension)
-
-   with fits.open(fits_file_path) as hdul:
-       # Print HDU information
-       print(f"FITS file has {len(hdul)} HDU(s)")
-       hdul.info()
-
-       # Find the HDU with image data
-       data = None
-       data_hdu_index = None
-       for i, hdu in enumerate(hdul):
-           print(f"HDU {i}: {hdu.name}, type={type(hdu)}, shape={getattr(hdu.data, 'shape', 'N/A')}")
-           if hdu.data is not None and len(getattr(hdu.data, 'shape', [])) >= 2:
-               data = hdu.data
-               data_hdu_index = i
-               header = hdu.header
-               print(f"Found image data in HDU {i} with shape {data.shape}")
-               break
-
-       if data is None:
-           raise ValueError("No image data found in any HDU")
-
-   # For downloading large FITS files, verify the download
-   import os
-   import urllib.request
-
-   print(f"Downloading {url}...")
-   urllib.request.urlretrieve(url, local_path)
-   file_size_mb = os.path.getsize(local_path) / (1024 * 1024)
-   print(f"Download complete. File size: {file_size_mb:.2f} MB")
-
-   if file_size_mb < 0.1:
-       raise ValueError("Downloaded file is too small, may be corrupted")
-   \`\`\`
-
-8. The code runs in a containerized environment with /arc/home/username mounted as home directory`,
+          systemPrompt: STARAI_SYSTEM_PROMPT,
         }),
         signal: abortController.signal,
       });
@@ -386,36 +405,44 @@ const StarAIRunnerInterface: React.FC = () => {
       const data = await response.json();
       const responseContent = data.data?.response || data.response || '';
 
-      // Extract code if present
-      const extracted = extractCode(responseContent);
+      // Extract ALL code blocks for LEFT panel
+      const codeBlocks = extractAllCode(responseContent);
 
-      // Create conversation item
-      const newConversation: ConversationItem = {
-        id: Date.now().toString(),
-        prompt: prompt.trim(),
-        response: responseContent,
-        responseType: extracted ? 'code' : 'text',
+      // Create code snippets for each code block found
+      if (codeBlocks.length > 0) {
+        const newSnippets: CodeSnippet[] = codeBlocks.map((block, index) => ({
+          id: `${Date.now()}_${index}`,
+          code: block.code,
+          language: block.language,
+          timestamp: new Date(),
+          modelName: selectedModelName,
+          collapsed: false,
+          title: `Code snippet ${index + 1}`,
+        }));
+        setCodeSnippets(prev => [...prev, ...newSnippets]);
+
+        // Auto-select the first snippet
+        if (newSnippets.length > 0) {
+          setSelectedSnippetId(newSnippets[0].id);
+        }
+      }
+
+      // Strip code blocks from response text for RIGHT panel (conversation)
+      const textOnly = stripCodeBlocks(responseContent);
+
+      // Add AI response as a new conversation item (text only, no code)
+      const aiResponse: ConversationItem = {
+        id: Date.now().toString() + '_response',
+        prompt: '', // Empty prompt for AI responses
+        response: textOnly,
+        responseType: 'text', // Always text now, code goes to LEFT panel
         timestamp: new Date(),
         model: selectedModel,
         modelName: selectedModelName,
-        code: extracted?.code,
-        language: extracted?.language,
+        // No code/language fields - code is in LEFT panel now
       };
 
-      // Add to conversations
-      addConversation(newConversation);
-
-      // If code, load it to editor
-      if (extracted) {
-        setCurrentCode(extracted.code);
-        setCodeLanguage(extracted.language);
-        setIsCodeModified(false);
-        setStorageInfo(null); // Reset storage info
-        setLeftTab('code'); // Switch to code tab
-      }
-
-      // Clear prompt
-      setPrompt('');
+      addConversation(aiResponse);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setFormError('Request timeout. Please try again.');
@@ -434,16 +461,15 @@ const StarAIRunnerInterface: React.FC = () => {
     }
   }, [
     validateForm,
-    prompt,
+    buildContextualPrompt,
     apiKey,
     selectedModel,
     selectedModelName,
-    extractCode,
+    extractAllCode,
+    stripCodeBlocks,
     addConversation,
-    setCurrentCode,
-    setCodeLanguage,
-    setIsCodeModified,
-    setStorageInfo,
+    setCodeSnippets,
+    setSelectedSnippetId,
     addError,
   ]);
 
@@ -707,7 +733,7 @@ const StarAIRunnerInterface: React.FC = () => {
           top: 0,
           left: 0,
           right: 0,
-          bottom: 180, // Height for fixed prompt area
+          bottom: 165, // Reduced height for compact prompt area
           overflow: 'hidden',
           '@media print': {
             position: 'static',
@@ -726,16 +752,19 @@ const StarAIRunnerInterface: React.FC = () => {
             </Typography>
           </Box>
 
-          <Grid container spacing={2} sx={{ flex: 1, minHeight: 0, mt: 0 }}>
+          <Grid container spacing={2} sx={{ flex: 1, minHeight: 0, mt: 0, overflow: 'hidden' }}>
             {/* Left Panel - Code/Results */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, height: '100%' }}>
               <Paper
                 variant="outlined"
                 sx={{
                   p: 2,
-                  height: '100%',
+                  flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
+                  minHeight: 0,
+                  maxHeight: '100%',
+                  overflow: 'hidden',
                 }}
               >
                 <Tabs
@@ -759,28 +788,49 @@ const StarAIRunnerInterface: React.FC = () => {
                       bottom: 0,
                       display: leftTab === 'code' ? 'flex' : 'none',
                       flexDirection: 'column',
+                      gap: 2,
                     }}
                   >
-                    <CodeEditor
-                      code={currentCode}
-                      language={codeLanguage}
-                      onChange={setCurrentCode}
-                      onStore={handleStoreCode}
-                      onRun={handleRunCode}
-                      isStoring={isStoring}
-                      isExecuting={isExecuting}
-                      isModified={isCodeModified}
-                      storedFilePath={storageInfo?.filePath || null}
-                      height="100%"
-                      registryUsername={registryUsername}
-                      registrySecret={registrySecret}
-                      containerImage={containerImage}
-                      onSettingsChange={(username, secret, image) => {
-                        setRegistryAuth(username, secret);
-                        setContainerImage(image);
-                      }}
-                      onResetImage={resetContainerImage}
-                    />
+                    {/* Code Snippets List */}
+                    <Box sx={{ flex: codeSnippets.length > 0 ? 0.5 : 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                      <CodeSnippetsList
+                        snippets={codeSnippets}
+                        selectedSnippetId={selectedSnippetId}
+                        onSelectSnippet={setSelectedSnippetId}
+                        onLoadSnippet={handleLoadSnippet}
+                        onToggleCollapse={handleToggleCollapse}
+                        onDeleteSnippet={handleDeleteSnippet}
+                      />
+                    </Box>
+
+                    {/* Code Editor - Show when code is loaded */}
+                    {currentCode && (
+                      <Box sx={{ flex: 0.5, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          Editor
+                        </Typography>
+                        <CodeEditor
+                          code={currentCode}
+                          language={codeLanguage}
+                          onChange={setCurrentCode}
+                          onStore={handleStoreCode}
+                          onRun={handleRunCode}
+                          isStoring={isStoring}
+                          isExecuting={isExecuting}
+                          isModified={isCodeModified}
+                          storedFilePath={storageInfo?.filePath || null}
+                          height="100%"
+                          registryUsername={registryUsername}
+                          registrySecret={registrySecret}
+                          containerImage={containerImage}
+                          onSettingsChange={(username, secret, image) => {
+                            setRegistryAuth(username, secret);
+                            setContainerImage(image);
+                          }}
+                          onResetImage={resetContainerImage}
+                        />
+                      </Box>
+                    )}
                   </Box>
 
                   {/* Logs Tab Panel - Keep mounted */}
@@ -912,14 +962,16 @@ const StarAIRunnerInterface: React.FC = () => {
             </Grid>
 
             {/* Right Panel - Conversation History */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, height: '100%' }}>
               <Paper
                 variant="outlined"
                 sx={{
                   p: 2,
-                  height: '100%',
+                  flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
+                  minHeight: 0,
+                  maxHeight: '100%',
                   overflow: 'hidden',
                 }}
               >
@@ -928,8 +980,6 @@ const StarAIRunnerInterface: React.FC = () => {
                   activeTab={activeConversationTab}
                   onTabChange={setActiveConversationTab}
                   onCloseTab={removeConversation}
-                  onLoadCode={handleLoadCode}
-                  maxHeight="100%"
                 />
               </Paper>
             </Grid>
@@ -947,17 +997,90 @@ const StarAIRunnerInterface: React.FC = () => {
           backgroundColor: 'background.default',
           borderTop: 1,
           borderColor: 'divider',
-          pb: 3,
-          pt: 2,
+          pb: 1.5,
+          pt: 1,
           '@media print': { display: 'none' },
         }}
       >
         <Container maxWidth="xl">
           {formError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFormError('')}>
+            <Alert severity="error" sx={{ mb: 1 }} onClose={() => setFormError('')}>
               {formError}
             </Alert>
           )}
+
+          {/* Context Inclusion Checkboxes - Compact Single Row */}
+          <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+              Add prompt context:
+            </Typography>
+            <FormGroup row sx={{ gap: 1 }}>
+              <FormControlLabel
+                sx={{ m: 0 }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={includeConversation}
+                    onChange={(e) => setIncludeConversation(e.target.checked)}
+                    disabled={isSubmitting || conversations.length === 0}
+                  />
+                }
+                label={
+                  <Typography variant="caption">
+                    Conversation {conversations.length === 0 && '(empty)'}
+                  </Typography>
+                }
+              />
+              <FormControlLabel
+                sx={{ m: 0 }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={includeCode}
+                    onChange={(e) => setIncludeCode(e.target.checked)}
+                    disabled={isSubmitting || !currentCode.trim()}
+                  />
+                }
+                label={
+                  <Typography variant="caption">
+                    Code {!currentCode.trim() && '(empty)'}
+                  </Typography>
+                }
+              />
+              <FormControlLabel
+                sx={{ m: 0 }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={includeLogs}
+                    onChange={(e) => setIncludeLogs(e.target.checked)}
+                    disabled={isSubmitting || !executionResults.trim()}
+                  />
+                }
+                label={
+                  <Typography variant="caption">
+                    Logs {!executionResults.trim() && '(empty)'}
+                  </Typography>
+                }
+              />
+              <FormControlLabel
+                sx={{ m: 0 }}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={includeResults}
+                    onChange={(e) => setIncludeResults(e.target.checked)}
+                    disabled={isSubmitting || !resultsFileContent.trim()}
+                  />
+                }
+                label={
+                  <Typography variant="caption">
+                    Results {!resultsFileContent.trim() && '(empty)'}
+                  </Typography>
+                }
+              />
+            </FormGroup>
+          </Box>
 
           <Box
             sx={{
@@ -974,8 +1097,8 @@ const StarAIRunnerInterface: React.FC = () => {
                 disabled={isSubmitting}
                 placeholder="Describe the code you want to generate (e.g., 'Create a Python script to analyze CSV data')..."
                 maxLength={4000}
-                minRows={3}
-                maxRows={6}
+                minRows={2}
+                maxRows={5}
                 fullWidth
                 aria-label="AI prompt input"
                 modelInfo={{
