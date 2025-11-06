@@ -37,7 +37,7 @@ export const GET = withErrorHandling(async (
   const authHeaders = await forwardAuthHeader(request);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v0/session/${sessionId}?view=events`,
+    `${serverApiConfig.skaha.baseUrl}/${serverApiConfig.skaha.apiVersion}/session/${sessionId}?view=events`,
     {
       method: 'GET',
       headers: {

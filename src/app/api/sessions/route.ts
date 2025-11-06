@@ -44,7 +44,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   console.log('📨 Session GET route - final headers:', finalHeaders);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v0/session`,
+    `${serverApiConfig.skaha.baseUrl}/${serverApiConfig.skaha.apiVersion}/session`,
     {
       method: 'GET',
       headers: finalHeaders,
@@ -154,7 +154,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   logger.info(`Launching session: ${body.sessionName} with image: ${body.containerImage}`);
 
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v0/session`,
+    `${serverApiConfig.skaha.baseUrl}/${serverApiConfig.skaha.apiVersion}/session`,
     {
       method: 'POST',
       headers,

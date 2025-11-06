@@ -2,18 +2,13 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { AppBarWithAuth } from '@/app/components/AppBarWithAuth/AppBarWithAuth';
 import { ActiveSessionsWidget } from '@/app/components/ActiveSessionsWidget/ActiveSessionsWidget';
 import { UserStorageWidget } from '@/app/components/UserStorageWidget/UserStorageWidget';
 import { LaunchFormWidget } from '@/app/components/LaunchFormWidget/LaunchFormWidget';
 import { PlatformLoad } from '@/app/components/PlatformLoad/PlatformLoad';
-import { VOSpaceStorageWidget } from '@/app/components/VOSpaceStorageWidget/VOSpaceStorageWidget';
 import { StarAIWidget } from '@/app/components/StarAIWidget/StarAIWidget';
-import { Footer } from '@/app/components/Footer/Footer';
 import { Box } from '@/app/components/Box/Box';
 import { Container } from '@mui/material';
-import { ThemeToggle } from '@/app/components/ThemeToggle/ThemeToggle';
-import { appBarWithUserMenu, CanfarLogo, SRCNetLogo } from '@/stories/shared/navigation';
 import type { SessionCardProps } from '@/app/types/SessionCardProps';
 import type { PlatformLoadData } from '@/app/types/PlatformLoadProps';
 import { useAuthStatus } from '@/lib/hooks/useAuth';
@@ -23,24 +18,8 @@ import { useContainerImages, useImageRepositories, useContext } from '@/lib/hook
 import { useQueryClient } from '@tanstack/react-query';
 import type { Session, SessionLaunchParams } from '@/lib/api/skaha';
 import { saveToken, hasToken } from '@/lib/auth/token-storage';
-import {
-  DOCS_URL,
-  ABOUT_URL,
-  OPEN_SOURCE_URL,
-  SUPPORT_EMAIL,
-  DISCORD_URL,
-  STORAGE_MANAGEMENT_URL,
-  GROUP_MANAGEMENT_URL,
-  DATA_PUBLICATION_URL,
-  SCIENCE_PORTAL_URL,
-  CADC_SEARCH_URL,
-  OPENSTACK_CLOUD_URL,
-} from '@/lib/config/site-config';
 
 export default function SciencePortalPage() {
-  // Check if in OIDC mode (CANFAR mode when NEXT_PUBLIC_USE_CANFAR=true)
-  // Environment variables are available at build time, so no need to check window
-  const isOIDCMode = process.env.NEXT_PUBLIC_USE_CANFAR !== 'true';
 
   // Get NextAuth session to extract and save token
   const { data: session, status: sessionStatus } = useSession();
@@ -314,13 +293,6 @@ export default function SciencePortalPage() {
     refetchContext();
   }, [refetchImages, refetchRepositories, refetchContext]);
 
-  // Handle refresh for VOSpace Storage Widget
-  const handleVOSpaceRefresh = useCallback(() => {
-    // VOSpace widget manages its own query invalidation
-    // This callback is provided for potential future use
-    console.log('VOSpace refresh requested');
-  }, []);
-
   // Provide placeholder data for Platform Load when data is not yet loaded
   const platformLoadDataOrPlaceholder: PlatformLoadData = useMemo(() => {
     if (platformLoadData) {
@@ -336,68 +308,17 @@ export default function SciencePortalPage() {
     };
   }, [platformLoadData]);
 
-  const footerSections = [
-    {
-      title: 'Resources',
-      links: [
-        { label: 'Documentation', href: DOCS_URL, external: true },
-        { label: 'About', href: ABOUT_URL, external: true },
-        { label: 'Open Source', href: OPEN_SOURCE_URL, external: true },
-      ],
-    },
-    {
-      title: 'Services',
-      links: [
-        { label: 'Storage Management', href: STORAGE_MANAGEMENT_URL, external: true },
-        { label: 'Group Management', href: GROUP_MANAGEMENT_URL, external: true },
-        { label: 'Data Publication', href: DATA_PUBLICATION_URL, external: true },
-        { label: 'Science Portal', href: SCIENCE_PORTAL_URL, external: true },
-        { label: 'CADC Search', href: CADC_SEARCH_URL, external: true },
-        { label: 'OpenStack Cloud', href: OPENSTACK_CLOUD_URL, external: true },
-      ],
-    },
-    {
-      title: 'Support',
-      links: [
-        { label: 'Help', href: SUPPORT_EMAIL, external: false },
-        { label: 'Join us on Discord', href: DISCORD_URL, external: true },
-      ],
-    },
-  ];
-
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        backgroundColor: 'background.default',
-      }}
-    >
-      {/* AppBar with Science Portal wordmark */}
-      <AppBarWithAuth
-        variant="surface"
-        position="sticky"
-        elevation={0}
-        wordmark="Science Portal"
-        logoHref="/"
-        logo={isOIDCMode ? <SRCNetLogo /> : <CanfarLogo />}
-        links={isOIDCMode ? [] : appBarWithUserMenu.links}
-        accountButton={<ThemeToggle size="md" />}
-        showLoginButton={true}
-      />
-
-      {/* Main content area */}
-      <Box component="main" sx={{ flex: 1, pt: 2 }}>
-        {/* Active Sessions and User Storage Widgets - 80/20 split */}
-        <Container maxWidth="xl" sx={{ mb: 4, px: { xs: 2, sm: 3 } }}>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', lg: 'row' },
-              gap: 3,
-            }}
-          >
+    <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+      {/* Active Sessions and User Storage Widgets - 80/20 split */}
+      <Box sx={{ mb: 4 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', lg: 'row' },
+            gap: 3,
+          }}
+        >
             {/* ActiveSessionsWidget - 80% width on large screens */}
             <Box
               sx={{
@@ -428,19 +349,19 @@ export default function SciencePortalPage() {
                 name={authStatus?.user?.username || ''}
                 isLoading={isLoadingUserStorage}
               />
-            </Box>
           </Box>
-        </Container>
+        </Box>
+      </Box>
 
-        {/* 60/40 split container for LaunchFormWidget and PlatformLoad */}
-        <Container maxWidth="xl" sx={{ mb: 4, px: { xs: 2, sm: 3 } }}>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', lg: 'row' },
-              gap: 3,
-            }}
-          >
+      {/* 60/40 split container for LaunchFormWidget and PlatformLoad */}
+      <Box sx={{ mb: 4 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', lg: 'row' },
+            gap: 3,
+          }}
+        >
             {/* LaunchFormWidget - 60% width on large screens */}
             <Box
               sx={{
@@ -475,45 +396,20 @@ export default function SciencePortalPage() {
                 isLoading={isLoadingPlatform}
                 onRefresh={handlePlatformRefresh}
               />
-            </Box>
           </Box>
-        </Container>
-
-        {/* VOSpace Storage Widget - Full width */}
-        <Container maxWidth="xl" sx={{ mb: 4, px: { xs: 2, sm: 3 } }}>
-          <VOSpaceStorageWidget
-            title="VO Space Storage"
-            isAuthenticated={isAuthenticated}
-            username={authStatus?.user?.username || ''}
-            initialPath={authStatus?.user?.username ? `home/${authStatus.user.username}` : 'home'}
-            isLoading={isLoadingVOSpace}
-            onRefresh={handleVOSpaceRefresh}
-            showRefreshButton={true}
-          />
-        </Container>
-
-        {/* Star AI Widget - Full width */}
-        <Container maxWidth="xl" sx={{ mb: 4, px: { xs: 2, sm: 3 } }}>
-          <StarAIWidget
-            title="Star AI"
-            isAuthenticated={isAuthenticated}
-            username={authStatus?.user?.username || ''}
-            initialPath={authStatus?.user?.username ? `home/${authStatus.user.username}` : 'home'}
-            onRefresh={handleVOSpaceRefresh}
-            showRefreshButton={true}
-            onFolderCreated={handleVOSpaceRefresh}
-            onFileCreated={handleVOSpaceRefresh}
-          />
-        </Container>
+        </Box>
       </Box>
 
-      {/* Footer - full width - CANFAR mode only */}
-      {!isOIDCMode && (
-        <Footer
-          sections={footerSections}
-          copyright="© 2022-2025"
+      {/* Star AI Widget - Full width */}
+      <Box sx={{ mb: 4 }}>
+        <StarAIWidget
+          title="Star AI"
+          isAuthenticated={isAuthenticated}
+          username={authStatus?.user?.username || ''}
+          initialPath={authStatus?.user?.username ? `home/${authStatus.user.username}` : 'home'}
+          showRefreshButton={true}
         />
-      )}
-    </Box>
+      </Box>
+    </Container>
   );
 }

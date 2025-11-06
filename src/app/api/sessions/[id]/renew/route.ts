@@ -51,7 +51,7 @@ export const POST = withErrorHandling(async (
 
   // SKAHA API: POST /v0/session/{sessionID} with action=renew as form data
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v0/session/${sessionId}`,
+    `${serverApiConfig.skaha.baseUrl}/${serverApiConfig.skaha.apiVersion}/session/${sessionId}`,
     {
       method: 'POST',
       headers: {
@@ -86,7 +86,7 @@ export const POST = withErrorHandling(async (
 
     // Fetch the updated session details
     const sessionResponse = await fetchExternalApi(
-      `${serverApiConfig.skaha.baseUrl}/v0/session/${sessionId}`,
+      `${serverApiConfig.skaha.baseUrl}/${serverApiConfig.skaha.apiVersion}/session/${sessionId}`,
       {
         method: 'GET',
         headers: {

@@ -112,15 +112,16 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   logger.info(`Launching headless session: ${body.sessionName} with image: ${body.containerImage}`);
 
-  // Use Skaha v0 API for headless sessions
+  // Launch headless session with extended timeout for slow Skaha API
+  // Session launches can take 30-90 seconds, especially for private images
   const response = await fetchExternalApi(
-    `${serverApiConfig.skaha.baseUrl}/v0/session`,
+    `${serverApiConfig.skaha.baseUrl}/${serverApiConfig.skaha.apiVersion}/session`,
     {
       method: 'POST',
       headers,
       body: formData.toString(),
     },
-    serverApiConfig.skaha.timeout
+    serverApiConfig.skaha.timeout // Default 90s, can be overridden with SKAHA_TIMEOUT env var
   );
 
   if (!response.ok) {

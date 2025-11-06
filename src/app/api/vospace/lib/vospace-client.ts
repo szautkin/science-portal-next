@@ -128,6 +128,15 @@ export class VOSpaceClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+
+      // Handle 409 Conflict gracefully - folder already exists
+      if (response.status === 409 && errorText.includes('DuplicateNode')) {
+        // Folder already exists, this is not an error
+        console.log(`[VOSpace] Folder already exists: ${normalizedPath}`);
+        return;
+      }
+
+      // For other errors, throw
       throw new Error(
         `Failed to create folder: ${response.status} ${response.statusText}. ${errorText}`
       );
@@ -163,6 +172,15 @@ export class VOSpaceClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+
+      // Handle 409 Conflict gracefully - file node already exists
+      if (response.status === 409 && errorText.includes('DuplicateNode')) {
+        // File node already exists, this is not an error
+        console.log(`[VOSpace] File node already exists: ${normalizedPath}`);
+        return;
+      }
+
+      // For other errors, throw
       throw new Error(
         `Failed to create data node: ${response.status} ${response.statusText}. ${errorText}`
       );
@@ -188,16 +206,8 @@ export class VOSpaceClient {
 
     if (!exists) {
       // Only create the data node if it doesn't already exist
-      try {
-        await this.createDataNode(normalizedPath, undefined, token);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        // If we still get 409 (race condition), that's fine - proceed with upload
-        if (!errorMessage.includes('409')) {
-          throw error;
-        }
-      }
+      // Note: createDataNode handles 409 Conflict gracefully if node exists
+      await this.createDataNode(normalizedPath, undefined, token);
     }
 
     // Step 2: Get transfer endpoint for upload using synchronous transfer
@@ -395,42 +405,65 @@ export class VOSpaceClient {
     const transferXml = generateTransferRequest(uri, direction, protocol);
     const endpoint = `${this.baseUrl}/synctrans`;
 
-    const response = await fetchExternalApi(
-      endpoint,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'text/xml',
-          Accept: 'text/plain',
-        },
-        body: transferXml,
-      },
-      this.timeout
-    );
+    // Use longer timeout for transfer endpoint operations (they can be slow)
+    // and implement retry logic with exponential backoff
+    const transferTimeout = Math.max(this.timeout * 2, 60000); // At least 60 seconds
+    const maxRetries = 2;
+    let lastError: Error | null = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to get sync transfer endpoint: ${response.status} ${response.statusText}. ${errorText}`
-      );
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`[VOSpace] Retrying getSyncTransferEndpoint (attempt ${attempt + 1}/${maxRetries + 1}) after ${backoffDelay}ms`);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        }
+
+        const response = await fetchExternalApi(
+          endpoint,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'text/xml',
+              Accept: 'text/plain',
+            },
+            body: transferXml,
+          },
+          transferTimeout
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to get sync transfer endpoint: ${response.status} ${response.statusText}. ${errorText}`
+          );
+        }
+
+        // Success - parse and return the endpoint
+        const responseText = await response.text();
+        const urlMatch = responseText.match(/<vos:endpoint>(.*?)<\/vos:endpoint>/);
+
+        if (!urlMatch || !urlMatch[1]) {
+          throw new Error('Transfer endpoint URL not found in response');
+        }
+
+        return {
+          url: urlMatch[1],
+          protocol,
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Only retry on timeout errors
+        if (!lastError.message.includes('timeout') || attempt === maxRetries) {
+          throw lastError;
+        }
+      }
     }
 
-    // Parse the XML response to extract the endpoint URL
-    const responseXml = await response.text();
-
-    // Extract endpoint URL from XML: <vos:protocol><vos:endpoint>URL</vos:endpoint></vos:protocol>
-    const endpointMatch = responseXml.match(/<[^:]*:endpoint[^>]*>([^<]+)<\/[^:]*:endpoint>/);
-    if (!endpointMatch || !endpointMatch[1]) {
-      throw new Error('Could not extract endpoint from synctrans response');
-    }
-
-    const transferUrl = endpointMatch[1].trim();
-
-    return {
-      url: transferUrl,
-      protocol,
-    };
+    // Should never reach here, but TypeScript needs this
+    throw lastError || new Error('Failed to get transfer endpoint after retries');
   }
 
   /**
