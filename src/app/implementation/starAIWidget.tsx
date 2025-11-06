@@ -22,12 +22,12 @@ import {
   Select,
   MenuItem,
   LinearProgress,
-  Grid,
   Tooltip,
   FormControl,
   InputLabel,
   SelectChangeEvent,
   Popover,
+  Grid,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -496,7 +496,7 @@ export const StarAIWidgetImpl = React.forwardRef<
         {/* Main Content - Three Column Layout */}
         <Grid container spacing={2}>
           {/* Folder Creation Section */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box
               sx={{
                 padding: theme.spacing(2),
@@ -544,7 +544,7 @@ export const StarAIWidgetImpl = React.forwardRef<
           </Grid>
 
           {/* File Creation Section */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box
               sx={{
                 padding: theme.spacing(2),
@@ -647,7 +647,7 @@ export const StarAIWidgetImpl = React.forwardRef<
           </Grid>
 
           {/* Python Script Execution Section */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box
               sx={{
                 padding: theme.spacing(2),
@@ -734,7 +734,7 @@ export const StarAIWidgetImpl = React.forwardRef<
 
               {/* Resource Allocation Grid */}
               <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                   <TextField
                     fullWidth
                     type="number"
@@ -755,7 +755,7 @@ export const StarAIWidgetImpl = React.forwardRef<
                     disabled={isLoading || !isAuthenticated}
                   />
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                   <TextField
                     fullWidth
                     type="number"

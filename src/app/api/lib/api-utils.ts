@@ -221,7 +221,7 @@ export function forwardCookies(clientRequest: NextRequest): HeadersInit {
  * @param clientRequest - The incoming Next.js request
  * @returns Headers object with Authorization header if available
  */
-export async function forwardAuthHeader(clientRequest: NextRequest): Promise<HeadersInit> {
+export async function forwardAuthHeader(clientRequest: NextRequest): Promise<Record<string, string>> {
   const isOIDC = process.env.NEXT_USE_CANFAR !== 'true';
 
   console.log('🔧 forwardAuthHeader called');

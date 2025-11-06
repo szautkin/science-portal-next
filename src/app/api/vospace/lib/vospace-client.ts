@@ -218,6 +218,12 @@ export class VOSpaceClient {
     );
 
     // Step 3: Upload the content to the transfer URL
+    // Convert Buffer to Blob for Web API compatibility
+    // Use Uint8Array constructor to ensure type compatibility
+    const bodyContent = typeof content === 'string'
+      ? content
+      : new Blob([new Uint8Array(content)]);
+
     const uploadResponse = await fetchExternalApi(
       transferEndpoint.url,
       {
@@ -226,7 +232,7 @@ export class VOSpaceClient {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/octet-stream',
         },
-        body: content,
+        body: bodyContent,
       },
       this.timeout * 2 // Double timeout for uploads
     );

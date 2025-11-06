@@ -707,12 +707,12 @@ export const VOSpaceStorageWidgetImpl = React.forwardRef<
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="caption" color="text.secondary">
-                          {nodeIsContainer ? '-' : fileSizeFormatter(node.size)}
+                          {nodeIsContainer ? '-' : fileSizeFormatter(node.size ?? 0)}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="caption" color="text.secondary">
-                          {dateFormatter(node.modified)}
+                          {node.modified ? dateFormatter(node.modified) : '-'}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">

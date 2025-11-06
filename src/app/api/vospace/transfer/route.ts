@@ -193,8 +193,11 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     // Determine content type based on file extension
     const contentType = getContentType(filename);
 
+    // Convert Buffer to Blob for NextResponse compatibility
+    const blob = new Blob([new Uint8Array(content)]);
+
     // Return file as response
-    return new NextResponse(content, {
+    return new NextResponse(blob, {
       status: HTTP_STATUS.OK,
       headers: {
         'Content-Type': contentType,

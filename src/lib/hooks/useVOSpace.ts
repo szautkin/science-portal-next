@@ -414,9 +414,10 @@ export function useCreateFile() {
       console.log('[VOSpace] Creating file:', `${path}/${filename}`);
 
       // Create a File object from the content
+      // Convert Buffer to Uint8Array for Web API compatibility
       const blob = typeof content === 'string'
         ? new Blob([content], { type: contentType })
-        : new Blob([content], { type: contentType });
+        : new Blob([new Uint8Array(content)], { type: contentType });
 
       const file = new File([blob], filename, { type: contentType });
 
