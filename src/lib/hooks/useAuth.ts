@@ -75,12 +75,15 @@ export function useAuthStatus(
   const isCanfar = isCanfarMode();
 
  // For CANFAR mode, use existing auth status check
+  // Only call status API if we have a token (user has logged in)
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('canfar_auth_token');
+
   const canfarAuthStatus = useQuery({
     queryKey: authKeys.status(),
     queryFn: () => {
       return canfarGetAuthStatus();
     },
-    enabled: isCanfar,
+    enabled: isCanfar && hasToken, // Only call if in CANFAR mode AND has token
     staleTime: 60000,
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
@@ -124,6 +127,17 @@ export function useAuthStatus(
       isError: false,
       error: null,
       refetch: () => Promise.resolve({ data: oidcAuthStatus } as any),
+    } as any;
+  }
+
+  // In CANFAR mode, if no token exists, return unauthenticated immediately
+  if (!hasToken) {
+    return {
+      data: { authenticated: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: () => Promise.resolve({ data: { authenticated: false } } as any),
     } as any;
   }
 
