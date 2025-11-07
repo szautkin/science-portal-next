@@ -401,6 +401,7 @@ export default function SciencePortalPage() {
       </Box>
 
       {/* Star AI Widget - Full width */}
+        {/*
       <Box sx={{ mb: 4 }}>
         <StarAIWidget
           title="Star AI"
@@ -409,7 +410,7 @@ export default function SciencePortalPage() {
           initialPath={authStatus?.user?.username ? `home/${authStatus.user.username}` : 'home'}
           showRefreshButton={true}
         />
-      </Box>
+      </Box>*/}
     </Container>
   );
 }

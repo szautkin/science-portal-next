@@ -121,10 +121,10 @@ export interface StorageInfo {
 export interface SessionConfig {
   /** Container image to use */
   containerImage: string;
-  /** Number of CPU cores */
-  cores: number;
-  /** RAM in GB */
-  ram: number;
+  /** Number of CPU cores (optional - uses system default if undefined) */
+  cores?: number;
+  /** RAM in GB (optional - uses system default if undefined) */
+  ram?: number;
   /** Number of GPUs (optional) */
   gpus?: number;
   /** Command line arguments */

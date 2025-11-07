@@ -13,8 +13,6 @@ import { getAuthHeader } from '@/lib/auth/token-storage';
 interface UseCodeExecutionOptions {
   onSuccess?: (sessionId: string) => void;
   onError?: (error: string) => void;
-  defaultCores?: number;
-  defaultRam?: number;
 }
 
 interface LaunchSessionParams {
@@ -32,8 +30,6 @@ export const useCodeExecution = (options: UseCodeExecutionOptions = {}) => {
   const {
     onSuccess,
     onError,
-    defaultCores = 2,
-    defaultRam = 4,
   } = options;
 
   const [isLaunching, setIsLaunching] = useState(false);
@@ -47,8 +43,8 @@ export const useCodeExecution = (options: UseCodeExecutionOptions = {}) => {
       const {
         language,
         filePath,
-        cores = defaultCores,
-        ram = defaultRam,
+        cores,
+        ram,
         sessionName,
         registryUsername,
         registrySecret,
@@ -70,8 +66,8 @@ export const useCodeExecution = (options: UseCodeExecutionOptions = {}) => {
         // to avoid SKAHA treating first arg as the executable
         const config: SessionConfig = {
           containerImage: imageToUse,
-          cores,
-          ram,
+          cores: cores,
+          ram: ram,
           gpus: 0,
           cmdArgs: [], // Empty - let ENTRYPOINT run without overrides
           env: {
@@ -85,22 +81,31 @@ export const useCodeExecution = (options: UseCodeExecutionOptions = {}) => {
           },
         };
 
-        // Build request payload
-        const payload = {
+        // Build request payload - only include cores/ram if defined
+        const payload: Record<string, unknown> = {
           sessionType: 'headless',
           sessionName: generatedSessionName,
           containerImage: config.containerImage,
-          cores: config.cores,
-          ram: config.ram,
           gpus: config.gpus,
           cmdArgs: config.cmdArgs,
           env: config.env,
-          // Include registry auth if provided
-          ...(registryUsername && registrySecret && {
-            registryUsername,
-            registrySecret,
-          }),
         };
+
+        // Only include cores if defined
+        if (cores !== undefined) {
+          payload.cores = cores;
+        }
+
+        // Only include ram if defined
+        if (ram !== undefined) {
+          payload.ram = ram;
+        }
+
+        // Include registry auth if provided
+        if (registryUsername && registrySecret) {
+          payload.registryUsername = registryUsername;
+          payload.registrySecret = registrySecret;
+        }
 
         console.log('[useCodeExecution] Launching session:', payload);
 
@@ -147,7 +152,7 @@ export const useCodeExecution = (options: UseCodeExecutionOptions = {}) => {
         setIsLaunching(false);
       }
     },
-    [defaultCores, defaultRam, onSuccess, onError]
+    [onSuccess, onError]
   );
 
   /**

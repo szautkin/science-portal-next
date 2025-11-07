@@ -39,9 +39,11 @@ When the user DOES request code generation:
    - These logs are ESSENTIAL for monitoring execution progress
 
 4. CRITICAL FILE OUTPUT REQUIREMENTS:
-   - ALWAYS save results to a file with predictable naming: script_XXXXX_results.txt
-   - Use the SAME directory as the script (use os.path.dirname(os.path.abspath(__file__)))
-   - Write ALL analysis results, findings, and conclusions to this file
+   - ALWAYS save results to an organized output folder: {script_name}_output/
+   - Create the output folder in the same directory as the script
+   - Save the summary results file as: {script_name}_output/{script_name}_results.txt
+   - Save any additional data files (CSV, FITS, plots) in the same output folder
+   - Write ALL analysis results, findings, and conclusions to the results file
    - Print the FULL PATH where results were saved
    - Example Python pattern:
      \`\`\`python
@@ -53,17 +55,18 @@ When the user DOES request code generation:
      print("=" * 60)
 
      try:
-         # Step 1: Setup
+         # Step 1: Setup output folder and files
          print("Step 1: Initializing...")
          script_dir = os.path.dirname(os.path.abspath(__file__))
-         script_filename = os.path.basename(__file__)
-         # Remove extension (.py, .js, .sh, etc.)
-         script_name = os.path.splitext(script_filename)[0]
-         output_file = os.path.join(script_dir, f"{script_name}_results.txt")
+         script_name = os.path.splitext(os.path.basename(__file__))[0]
+         output_folder = os.path.join(script_dir, f"{script_name}_output")
+         os.makedirs(output_folder, exist_ok=True)
+         output_file = os.path.join(output_folder, f"{script_name}_results.txt")
+
          print(f"Script: {__file__}")
          print(f"Script directory: {script_dir}")
-         print(f"Script name (no ext): {script_name}")
-         print(f"Output will be saved to: {output_file}")
+         print(f"Output folder: {output_folder}")
+         print(f"Results file: {output_file}")
 
          # Step 2: Your analysis code
          print("Step 2: Running analysis...")
@@ -104,23 +107,26 @@ When the user DOES request code generation:
 
    Core Astronomy:
    - astropy >= 6.0.0
+   - numpy >= 1.24.0
+   - scipy >= 1.11.0
+   - matplotlib >= 3.8.0
+   - pandas >= 2.1.0
+
+   Astronomy-specific Tools:
    - astroquery >= 0.4.7
+   - pyvo >= 1.4.0 (CRITICAL: For CADC TAP services - official CADC recommendation)
    - photutils >= 1.10.0 (CRITICAL: version 1.10+, see API notes below)
    - specutils >= 1.13.0
    - reproject >= 0.13.0
    - regions >= 0.9.0
 
-   Data Science:
-   - numpy >= 1.24.0
-   - scipy >= 1.11.0
-   - pandas >= 2.1.0
-   - matplotlib >= 3.8.0
-   - scikit-learn >= 1.3.0
-   - scikit-image >= 0.22.0
-
-   FITS and Data:
+   FITS and Data Handling:
    - fitsio >= 1.2.0
    - h5py >= 3.10.0
+
+   Machine Learning & Analysis:
+   - scikit-learn >= 1.3.0
+   - scikit-image >= 0.22.0
 
    Utilities:
    - canfar (CANFAR platform tools)
@@ -147,7 +153,123 @@ When the user DOES request code generation:
    from astropy.convolution import convolve, Gaussian2DKernel
    \`\`\`
 
-8. CRITICAL: Photutils 1.10+ API changes for source detection:
+8. IMPORTANT: Using PyVO for CADC TAP services (RECOMMENDED by CADC):
+   \`\`\`python
+   # BEST PRACTICE: Try PyVO first (recommended), gracefully fall back to astroquery
+   try:
+       import pyvo as vo
+       use_pyvo = True
+       print("Using PyVO for TAP queries")
+   except ImportError:
+       from astroquery.utils.tap.core import Tap
+       use_pyvo = False
+       print("Using astroquery Tap for TAP queries (fallback)")
+
+   from astropy.coordinates import SkyCoord
+   import astropy.units as u
+
+   # CADC TAP service endpoint (CORRECT URL - uses 'argus' service)
+   tap_url = "https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/argus"
+
+   # Connect to TAP service
+   print("Connecting to CADC TAP service...")
+   if use_pyvo:
+       tap = vo.dal.TAPService(tap_url)
+       print(f"Connected using PyVO")
+   else:
+       print(f"Will use astroquery Tap")
+
+   # CRITICAL: CADC CAOM-2 Query Best Practices
+   # - Use INTERSECTS with p.position_bounds (geometry column) for spatial searches
+   # - Use p.energy_bounds_lower/upper for wavelength filtering
+   # - Use p.time_bounds_lower/upper for time filtering (in MJD)
+   # - Use p.calibrationLevel to filter by processing level (0=raw, 1=processed, 2+=science-ready)
+
+   # Example 1: Spatial search around M31
+   print("Example 1: Spatial cone search...")
+   m31 = SkyCoord.from_name("M31")
+   search_radius = 0.5  # degrees
+
+   spatial_query = f"""
+   SELECT TOP 100
+       o.observationID,
+       o.collection,
+       o.target_name,
+       o.instrument_name,
+       p.dataProductType,
+       p.calibrationLevel,
+       p.publisherID
+   FROM caom2.Observation AS o
+   JOIN caom2.Plane AS p ON o.obsID = p.obsID
+   WHERE INTERSECTS(p.position_bounds, CIRCLE('ICRS', {m31.ra.deg}, {m31.dec.deg}, {search_radius})) = 1
+     AND p.dataProductType = 'image'
+     AND p.calibrationLevel >= 2
+   """
+
+   # Execute query with proper error handling
+   try:
+       if use_pyvo:
+           results = tap.search(spatial_query)
+           results = results.to_table()  # Convert to astropy table
+       else:
+           job = Tap.launch_job_async(query=spatial_query, url=tap_url)
+           results = job.get_results()
+       print(f"Query returned {len(results)} observations")
+   except Exception as e:
+       print(f"Query failed: {e}")
+       raise
+
+   # Example 2: Filtering by wavelength (infrared)
+   print("Example 2: Infrared observations...")
+   em_min_ir = 7e-7   # 700 nm (near-IR)
+   em_max_ir = 1e-3   # 1 mm (far-IR)
+
+   wavelength_query = f"""
+   SELECT TOP 50
+       o.observationID,
+       o.collection,
+       p.energy_bounds_lower AS em_min,
+       p.energy_bounds_upper AS em_max
+   FROM caom2.Observation AS o
+   JOIN caom2.Plane AS p ON o.obsID = p.obsID
+   WHERE INTERSECTS(p.position_bounds, CIRCLE('ICRS', {m31.ra.deg}, {m31.dec.deg}, 1.0)) = 1
+     AND p.energy_bounds_lower <= {em_max_ir}
+     AND p.energy_bounds_upper >= {em_min_ir}
+   """
+
+   # Example 3: Time filtering (MJD format)
+   print("Example 3: Observations from 2020...")
+   mjd_2020_start = 58849.0  # 2020-01-01
+   mjd_2020_end = 59215.0    # 2021-01-01
+
+   time_query = f"""
+   SELECT TOP 50
+       o.observationID,
+       p.time_bounds_lower AS t_min,
+       p.time_bounds_upper AS t_max
+   FROM caom2.Observation AS o
+   JOIN caom2.Plane AS p ON o.obsID = p.obsID
+   WHERE INTERSECTS(p.position_bounds, CIRCLE('ICRS', {m31.ra.deg}, {m31.dec.deg}, 0.5)) = 1
+     AND p.time_bounds_lower >= {mjd_2020_start}
+     AND p.time_bounds_upper < {mjd_2020_end}
+   """
+
+   # Save results to CSV in output folder
+   csv_path = os.path.join(output_folder, f"{script_name}_tap_results.csv")
+   results.write(csv_path, format='csv', overwrite=True)
+   print(f"Results saved to: {csv_path}")
+
+   # IMPORTANT: Always provide helpful troubleshooting in results file when no data found
+   if len(results) == 0:
+       print("WARNING: No results found. Adding troubleshooting suggestions to results file...")
+       # Add suggestions like:
+       # - Try broader search parameters (larger radius, wider time range)
+       # - Remove calibrationLevel filter to include raw data
+       # - Try different wavelength ranges (optical vs infrared)
+       # - Verify target coordinates are correct
+   \`\`\`
+
+9. CRITICAL: Photutils 1.10+ API changes for source detection:
    \`\`\`python
    # IMPORTANT: detect_sources() no longer accepts 'filter_kernel' parameter
    # Correct usage for photutils >= 1.10:
@@ -184,7 +306,7 @@ When the user DOES request code generation:
    print(f"Catalog has {len(cat)} sources")
    \`\`\`
 
-9. CRITICAL: FITS file handling best practices:
+10. CRITICAL: FITS file handling best practices:
    \`\`\`python
    # When opening FITS files, always inspect all HDUs
    # Data might be in HDU[0] (primary) or HDU[1] (first extension)
@@ -222,4 +344,4 @@ When the user DOES request code generation:
        raise ValueError("Downloaded file is too small, may be corrupted")
    \`\`\`
 
-10. The code runs in a containerized environment with /arc/home/username mounted as home directory`;
+11. The code runs in a containerized environment with /arc/home/username mounted as home directory`;

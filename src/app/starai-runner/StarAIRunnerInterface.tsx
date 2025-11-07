@@ -596,12 +596,10 @@ ${contextSections.join('\n')}`;
     });
     setExecutionStartTime(new Date());
 
-    // Launch session
+    // Launch session (cores and ram undefined - use system defaults)
     await launchSession({
       language: codeLanguage,
       filePath: currentStorageInfo.filePath,
-      cores: 2,
-      ram: 4,
       registryUsername,
       registrySecret,
       containerImage,

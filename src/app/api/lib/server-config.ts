@@ -107,7 +107,7 @@ export const serverApiConfig = {
   },
   skaha: {
     baseUrl: getSkahaBaseUrl(),
-    apiVersion: 'v1', // Use v1 API for better reliability (change to 'v0' if needed)
+    apiVersion: 'v0', // Use v1 API for better reliability (change to 'v0' if needed)
     // Skaha operations (especially session launches) can be slow, use longer timeout
     timeout: parseInt(process.env.SKAHA_TIMEOUT || process.env.API_TIMEOUT || process.env.NEXT_PUBLIC_API_TIMEOUT || '90000', 10),
   },

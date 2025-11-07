@@ -127,7 +127,15 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     }
   }
 
-  // CANFAR mode: Forward Authorization header to CANFAR whoami
+  // CANFAR mode: Check for Authorization header first
+  const authHeader = request.headers.get('authorization');
+
+  if (!authHeader) {
+    logger.info('No Authorization header - user not authenticated in CANFAR mode');
+    return successResponse<AuthStatus>({ authenticated: false });
+  }
+
+  // Forward Authorization header to CANFAR whoami
   const authHeaders = await forwardAuthHeader(request);
   const externalUrl = `${serverApiConfig.login.baseUrl}/whoami`;
 

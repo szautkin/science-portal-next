@@ -41,6 +41,16 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
 
   // CANFAR mode: Use custom auth with cookies
   try {
+    // Check if there's a Cookie header before making external call
+    const cookieHeader = request.headers.get('cookie');
+
+    // If no cookies at all, or only tracking cookies (no authentication cookies),
+    // skip the external call
+    if (!cookieHeader || !cookieHeader.includes('CADC_SSO')) {
+      // No authentication cookies present
+      return successResponse(null);
+    }
+
     const cookies = forwardCookies(request);
 
     // Call CANFAR whoami endpoint
